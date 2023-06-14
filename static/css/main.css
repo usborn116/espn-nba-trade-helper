@@ -1,0 +1,366 @@
+body{
+    margin-top: 5px;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    font-family: 'Montserrat', sans-serif;
+    text-decoration: none;
+    overflow: hidden;
+    letter-spacing: 2px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    justify-content: space-between;
+    background-color: white;
+}
+
+
+.header{
+    display: flex;
+    color: #00a083;
+    font-size: 30px;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    border-radius: 10px;
+    letter-spacing: 1px;
+    box-sizing: border-box;
+    background-image: url('/static/court.jpg');
+    background-size: cover;
+}
+
+.subheader{
+    display: flex;
+    color:  #00a083;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    border-radius: 10px;
+    letter-spacing: 1px;
+    box-sizing: border-box;
+}
+
+.subheader a{
+    text-decoration: none;
+    color: rgba(230,127,37,255);
+}
+
+.intro{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+.leagueinfo{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+form .submit, .leagueinfo .submit{
+    text-align: center;
+    border: 2px solid #00a083;
+	border-radius: 40px;
+	background: transparent;
+	color: #00a083;
+    letter-spacing: 1px;
+    font-size: 25px;
+    width:30%;
+    align-self: center;
+    padding: 0px;
+}
+
+form .submit:hover{
+    background-color: #00a083;
+    color: #fff;
+}
+
+#loader {
+    position: relative;
+    margin-left: auto;
+    margin-right: auto;
+    display: none;
+    background: no-repeat;
+    cursor: wait;
+    width: fit-content;
+    margin-top: 15px;
+}
+
+#loader img{
+    width: 40vw;
+    height: auto;
+    align-self: center;
+}
+
+#loadertext{
+    margin-top: 10px;
+    text-align: center;
+    font-size: 35px;
+    display:none;
+    width:center;
+    align-self: center;
+    animation: color-pulsate 1.5s infinite
+    /* animation: ring 1.2s linear infinite; */
+}
+  
+@keyframes color-pulsate {
+    0%   { color: rgba(230,127,37,255); }
+    50%  { color: #00a083; }
+    100% { color: rgba(230,127,37,255); }
+}
+
+.logout{
+    display: flex;
+    gap: 3px;
+    flex-direction: column;
+    font-size: 15px;
+    color: #2a1e24;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.logout .submit{
+    font-size: 15px;
+    width: auto;
+    margin-top: 0;
+    letter-spacing: 2px;
+    padding: 4px;
+}
+
+.logout .logouttext{
+    font-size: 13px;
+    margin-bottom: 2px;
+    margin-top: auto;
+}
+
+#content{
+    display: flex;
+}
+
+.box1, .box2{
+    justify-content: space-between;
+    margin-right: 0;
+    overflow: hidden;
+    top: 50%;
+    padding: 10px;
+    align-self: center;
+    text-decoration: none;
+    overflow: hidden;
+}
+
+.box1{
+    width: 30%;
+    color: #00a083;
+    margin-right: 10px;
+}
+
+.box1 th, .box1 td{
+    letter-spacing: 1px;
+    text-align: left;
+    padding-top: 10px;
+    letter-spacing: 1px;
+    padding-right: 5px;
+}
+
+.box2{
+    width: 60%;
+    display: flex;
+    flex-direction: column;
+    color: rgba(230,127,37,255);
+    justify-content: stretch;
+    padding: 10px;
+    border-left-style: solid;
+    border-color: black;
+    padding-left: 20px;
+}
+
+.box2 h2{
+    margin-top: 0;
+}
+
+.box2 form {
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+}
+
+.box2 form label{
+    text-align: left;
+    align-self: left;
+    font-size: 18px;
+    color: rgba(230,127,37,255);
+}
+
+.tradeform input, .leagueinfo input{
+    border: 0px solid black;
+    width: 90%;
+    height:45px;
+    text-align: left;
+    align-self: left;
+    font-size: 20px;
+    color: black;
+    border-bottom-style: hidden;
+    border-radius: 10px;
+    background-color: rgba(230,127,37,0.3);
+    margin-top: 10px;
+    margin-bottom: 15px;
+    box-sizing: border-box;
+    padding: 10px;
+}
+
+.leagueinfo input{
+    align-self: center;
+}
+
+.tradesubmit{
+    display: flex;
+    font-size: 18px;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+.tradesubmit .submit{
+    font-size: 13px;
+    width: auto;
+    margin-top: 0;
+    letter-spacing: 2px;
+}
+
+.box2 .submit, .submit{
+    text-align: center;
+    border: 1px solid #00a083;
+	border-radius: 40px;
+	background: transparent;
+	color: #00a083;
+    letter-spacing: 1px;
+    font-size: 18px;
+    width:30%;
+    align-self: left;
+    margin-top: 10px;
+}
+
+.box2 .submit:hover, .submit:hover{
+    background-color: #00a083;
+    color: #fff;
+}
+
+.info{
+    display: flex;
+    flex-direction: column;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+.info h1{
+    color: #00a083;
+}
+
+.info .dataframe, .rosterpage .dataframe{
+    border-collapse: collapse;
+    border: 1px solid rgba(0,160,131,1);
+}
+
+.info .dataframe th, .info .dataframe td, .rosterpage .dataframe td, .rosterpage .dataframe th{
+    border-spacing: 0;
+    padding: 5px;
+    text-align: left;
+    width: 5vw;
+}
+
+.info .dataframe th, .rosterpage .dataframe th{
+    color: white;
+    background-color: rgba(0,160,131,1);
+    font-size: 20px;
+}
+
+.info .dataframe td, .rosterpage .dataframe td{
+    color: rgba(230,127,37,1);
+    background-color: white;
+}
+
+.change .dataframe tbody tr:first-child {
+    display: none;
+}
+
+.return .submit{
+    text-align: center;
+    border: 1px solid #00a083;
+	border-radius: 40px;
+	background: transparent;
+	color: #00a083;
+    letter-spacing: 1px;
+    font-size: 24px;
+    width:30%;
+    align-self: left;
+    margin-top: 10px;
+}
+
+.return .submit:hover{
+    background-color: #00a083;
+    color: #fff;
+}
+
+#footer{
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+    align-items: center;
+    background-image: url('/static/court.jpg');
+    background-size: cover;
+}
+#footer p{
+    font-size: 15px;
+    color: #00a083;
+    background-color: #fff;
+}
+#footer #espn{
+    align-self: left;
+    width: 100px;
+    padding: 10px;
+}
+
+#footer #git{
+    align-self: right;
+    width: 50px;
+    height: auto;
+    padding: 10px;
+}
+
+.box2{
+    width: 90vw;
+}
+
+.listing{
+    text-decoration: none;
+    color: #00a083;
+}
+
+.listing:visited{
+    text-decoration: none;
+    color: #00a083;
+}
+
+.listing:hover{
+    text-decoration: none;
+    color: white;
+    background-color: #00a083;
+    padding: 5px;
+    border-radius: 10%;
+}
+
+.rosterpage{
+    display: flex;
+    flex-direction: column;
+    gap: 4vh;
+    margin: 2vh;
+}
+
+.nav{
+    width: fit-content;
+    height: auto;
+    padding: 10px;
+    text-decoration: none;
+}

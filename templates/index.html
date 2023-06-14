@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<script>
+    function loading() {
+        var x = document.getElementById("loader");
+        var t = document.getElementById("loadertext");
+        var y = document.getElementById("content");
+        x.style.display = "block";
+        y.style.display = "none";
+        t.style.display = 'block';
+    
+    }
+</script>
+{% endblock %}
+
+{% block body %}
+
+<div class="intro">
+
+    <h1 class="header">ESPN NBA Fantasy Trade Machine</h1>
+
+    {%if leagueid is defined %}
+    <div class="logout">
+        <h6 class="logouttext">League ID: {{ leagueid.lid }}</h6>
+        <form action="/" method="POST">
+            <button name="reset" type="submit" class="submit">Log Out of League</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div id="loadertext">...Processing Your Trade (this will take a moment)...</div>
+    <img id="loader" src="{{url_for('static', filename='bballspin.gif')}}" />
+
+    {% if ids is not defined %}
+    <h2 class="subheader">Enter your League Data</h2>
+    <h4 class="subheader"><a href="https://github.com/cwendt94/espn-api/discussions/150" target="_blank">Click here for help finding your league's S2 and SW ID</a> </h4>
+    <form action="/league" method="POST" class="leagueinfo">
+        <input type="text" name="s2" id="s2" placeholder="League S2">
+        <input type="text" name="sw" id="sw" placeholder="League SW ID">
+        <input type="text" name="lid" id="lid" placeholder="League ID">
+        <input type="text" name="lyear" id="lyear" placeholder="Year">
+        <input type="submit" value="Get My League" class="submit">
+    </form>
+    {% endif %}
+
+</div>
+
+{% if ids is defined %}
+<div id="content">
+
+<div class="box1">
+    <table class="index">
+        <thead>
+            <tr>
+                <th>Team (click for roster)</th>
+                <th>ID</th>
+            </tr>
+        </thead>
+        {% for key, value in ids.items() %}
+        <tr>
+            <td><a class="listing" href={{ "/teams/" ~ value['id'] }} target="_blank">{{key}}</a></td>
+            <td> {{value['id']}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>            
+
+<div class="box2">
+    <h2>Trade Info</h2>
+    <form action="/league/comp" method="POST" class="tradeform">
+        <input type="text" name="myteamid" id="myteamid" placeholder="Your Team ID">
+        <input type="text" name="otherteamid" id="otherteamid" placeholder ="Trade Partner's Team ID">
+        <input type="text" name="giving" id="giving" placeholder="Players you are trading, separated by a comma, no spaces in between">
+        <input type="text" name="getting" id="getting" placeholder="Players you are getting, separated by a comma, no spaces in between">
+        <div class="tradesubmit">
+        <input type="submit" value="Analyze This Trade!" class="submit" onclick="loading()">
+        </div>
+    </form>
+</div>
+
+</div>
+{% endif %}
+   
+{% endblock %}

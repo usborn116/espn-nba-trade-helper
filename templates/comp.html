@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="info">
+
+    <div class="return">
+        <form action="/league" method="POST">
+            <input type="submit" value="Start Over" class="submit">
+        </form>
+    </div>
+    
+    <h1>This is how your 2 teams compare:</h1><br>
+    <h1 class="comp">Team Comparison</h1>
+    <div class="results">{{ tcomptable | safe }}</div>
+
+    <h1 class="comp">Players Giving Up</h1>
+    <div class="results">{{ playersreleasing| safe }}</div>
+
+    <h1 class="comp">Players Attaining</h1>
+    <div class="results">{{ playersgetting | safe }}</div>
+
+    <h1 class="comp">Change in Stats</h1>
+    <div class="results change">{{ statchange | safe }}</div>
+    
+</div>
+{% endblock %}

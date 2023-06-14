@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<script>
+    function loading() {
+        var x = document.getElementById("loader");
+        var t = document.getElementById("loadertext");
+        var y = document.getElementById("content");
+        x.style.display = "block";
+        y.style.display = "none";
+        t.style.display = 'block';
+    
+    }
+</script>
+{% endblock %}
+
+{% block body %}
+
+<div class="rosterpage">
+    <a class="submit nav" href={{ url_for('league')}}>Go Back</a>
+    <div class="results">
+    <h2 class="subheader">{{team}} Team Roster</h2>
+        {{ roster | safe }}
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <title>ESPN Fantasy Trade Analyzer</title>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% block body %}{% endblock %}
+    <div id="footer">
+        <p>© Usborn Ocampo</p>
+        <a href='https://github.com/cwendt94/espn-api' target="_blank">
+            <img id='espn' src="{{url_for('static', filename='espnlogo.png')}}" />
+        </a>    
+        <a href='https://github.com/usborn116' target="_blank">
+            <img id='git' src="{{url_for('static', filename='github-mark.png')}}" />
+        </a>
+    </div>
+</body>
+</html>
