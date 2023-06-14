@@ -6,8 +6,8 @@ import pandas as pd
 db = SQLAlchemy()
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///league.db'
-#app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:2ckgBcCu4iVf3ZI@espn-fantasy-trade-helper.flycast:5432'
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///league.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///league'
 
 db.init_app(app)
 
