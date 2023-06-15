@@ -1,5 +1,7 @@
 This app is written with Python and Flask, and helps you decide how a trade will affect your team in ESPN NBA Fantasy.
 
+This app is live at https://espn-trade-helper.fly.dev/league.
+
 Simply clone the repo and install virtualenv via pip in the directory of this repo. Then, initiate a virtual environment, and install the following dependencies (I recommend installing with with pip):
 Flask, flask_sqlalchemy, espn-api, requests, and pandas.
 
