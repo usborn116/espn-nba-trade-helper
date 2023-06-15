@@ -1,4 +1,7 @@
-/.venv
-.dockerignore
-fly.toml
-Procfile
+/.venv/*
+/venv/*
+/.dockerignore
+/fly.toml
+/Procfile
+/instance/*
+/league.db
