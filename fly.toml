@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for espn-fantasy-trade-helper on 2023-06-14T11:45:24-07:00
+# fly.toml app configuration file generated for espn-trade-helper on 2023-06-14T15:38:00-07:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "espn-fantasy-trade-helper"
+app = "espn-trade-helper"
 primary_region = "sea"
 
 [build]
