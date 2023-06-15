@@ -23,3 +23,11 @@ The screen will show a loading animation as it parses the data to see how the tr
 Finally, you'll see data tables to show you the stat comparison between you and your trade partner, the stats of the players you are giving and getting, and how your team's stats are increased or decreased after the trade:
 ![CleanShot 2023-06-15 at 10 49 01](https://github.com/usborn116/espn-nba-trade-helper/assets/64931297/61ed8896-8ac5-43bf-ae44-8627cfd1ce8b)
 
+Articles that helped me with the Fly deployment of this project:
+- https://fly.io/docs/languages-and-frameworks/python/
+- https://fly.io/docs/postgres/connecting/connecting-internal/
+- https://fly.io/docs/postgres/connecting/connecting-external/
+- https://community.fly.io/t/deploying-python-flask-db/8456/7
+- https://docs.sqlalchemy.org/en/20/core/engines.html
+- https://flask-sqlalchemy.palletsprojects.com/en/3.0.x/config/#connection-url-format
+
