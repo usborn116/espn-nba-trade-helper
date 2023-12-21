@@ -17,7 +17,6 @@ from typing import (
 
 import numpy as np
 
-from pandas.compat import PY39
 from pandas.errors import UndefinedVariableError
 
 import pandas.core.common as com
@@ -44,7 +43,7 @@ from pandas.core.computation.parsing import (
 )
 from pandas.core.computation.scope import Scope
 
-import pandas.io.formats.printing as printing
+from pandas.io.formats import printing
 
 
 def _rewrite_assign(tok: tuple[int, str]) -> tuple[int, str]:
@@ -193,7 +192,7 @@ def _filter_nodes(superclass, all_nodes=_all_nodes):
     return frozenset(node_names)
 
 
-_all_node_names = frozenset(map(lambda x: x.__name__, _all_nodes))
+_all_node_names = frozenset(x.__name__ for x in _all_nodes)
 _mod_nodes = _filter_nodes(ast.mod)
 _stmt_nodes = _filter_nodes(ast.stmt)
 _expr_nodes = _filter_nodes(ast.expr)
@@ -207,9 +206,6 @@ _handler_nodes = _filter_nodes(ast.excepthandler)
 _arguments_nodes = _filter_nodes(ast.arguments)
 _keyword_nodes = _filter_nodes(ast.keyword)
 _alias_nodes = _filter_nodes(ast.alias)
-
-if not PY39:
-    _slice_nodes = _filter_nodes(ast.slice)
 
 
 # nodes that we don't support directly but are needed for parsing
@@ -382,7 +378,7 @@ class BaseExprVisitor(ast.NodeVisitor):
 
     unary_ops = UNARY_OPS_SYMS
     unary_op_nodes = "UAdd", "USub", "Invert", "Not"
-    unary_op_nodes_map = {k: v for k, v in zip(unary_ops, unary_op_nodes)}
+    unary_op_nodes_map = dict(zip(unary_ops, unary_op_nodes))
 
     rewrite_map = {
         ast.Eq: ast.In,
@@ -410,7 +406,7 @@ class BaseExprVisitor(ast.NodeVisitor):
                     e.msg = "Python keyword not valid identifier in numexpr query"
                 raise e
 
-        method = "visit_" + type(node).__name__
+        method = f"visit_{type(node).__name__}"
         visitor = getattr(self, method)
         return visitor(node, **kwargs)
 
@@ -430,7 +426,6 @@ class BaseExprVisitor(ast.NodeVisitor):
 
         # must be two terms and the comparison operator must be ==/!=/in/not in
         if is_term(left) and is_term(right) and op_type in self.rewrite_map:
-
             left_list, right_list = map(_is_list, (left, right))
             left_str, right_str = map(_is_str, (left, right))
 
@@ -548,15 +543,18 @@ class BaseExprVisitor(ast.NodeVisitor):
     def visit_Name(self, node, **kwargs):
         return self.term_type(node.id, self.env, **kwargs)
 
+    # TODO(py314): deprecated since Python 3.8. Remove after Python 3.14 is min
     def visit_NameConstant(self, node, **kwargs) -> Term:
         return self.const_type(node.value, self.env)
 
+    # TODO(py314): deprecated since Python 3.8. Remove after Python 3.14 is min
     def visit_Num(self, node, **kwargs) -> Term:
-        return self.const_type(node.n, self.env)
+        return self.const_type(node.value, self.env)
 
     def visit_Constant(self, node, **kwargs) -> Term:
-        return self.const_type(node.n, self.env)
+        return self.const_type(node.value, self.env)
 
+    # TODO(py314): deprecated since Python 3.8. Remove after Python 3.14 is min
     def visit_Str(self, node, **kwargs):
         name = self.env.add_tmp(node.s)
         return self.term_type(name, self.env)
@@ -656,7 +654,6 @@ class BaseExprVisitor(ast.NodeVisitor):
         raise ValueError(f"Invalid Attribute context {type(ctx).__name__}")
 
     def visit_Call(self, node, side=None, **kwargs):
-
         if isinstance(node.func, ast.Attribute) and node.func.attr != "__call__":
             res = self.visit_Attribute(node.func)
         elif not isinstance(node.func, ast.Name):
@@ -681,7 +678,6 @@ class BaseExprVisitor(ast.NodeVisitor):
             res = res.value
 
         if isinstance(res, FuncNode):
-
             new_args = [self.visit(arg) for arg in node.args]
 
             if node.keywords:
@@ -692,8 +688,7 @@ class BaseExprVisitor(ast.NodeVisitor):
             return res(*new_args)
 
         else:
-
-            new_args = [self.visit(arg).value for arg in node.args]
+            new_args = [self.visit(arg)(self.env) for arg in node.args]
 
             for key in node.keywords:
                 if not isinstance(key, ast.keyword):
@@ -704,7 +699,7 @@ class BaseExprVisitor(ast.NodeVisitor):
                     )
 
                 if key.arg:
-                    kwargs[key.arg] = self.visit(key.value).value
+                    kwargs[key.arg] = self.visit(key.value)(self.env)
 
             name = self.env.add_tmp(res(*new_args, **kwargs))
             return self.term_type(name=name, env=self.env)

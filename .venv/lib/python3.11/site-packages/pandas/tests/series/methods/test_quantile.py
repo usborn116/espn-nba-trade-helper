@@ -14,7 +14,6 @@ from pandas.core.indexes.datetimes import Timestamp
 
 class TestSeriesQuantile:
     def test_quantile(self, datetime_series):
-
         q = datetime_series.quantile(0.1)
         assert q == np.percentile(datetime_series.dropna(), 10)
 
@@ -44,8 +43,12 @@ class TestSeriesQuantile:
             with pytest.raises(ValueError, match=msg):
                 datetime_series.quantile(invalid)
 
-    def test_quantile_multi(self, datetime_series):
+        s = Series(np.random.default_rng(2).standard_normal(100))
+        percentile_array = [-0.5, 0.25, 1.5]
+        with pytest.raises(ValueError, match=msg):
+            s.quantile(percentile_array)
 
+    def test_quantile_multi(self, datetime_series):
         qs = [0.1, 0.9]
         result = datetime_series.quantile(qs)
         expected = Series(
@@ -99,7 +102,6 @@ class TestSeriesQuantile:
         assert is_integer(q)
 
     def test_quantile_nan(self):
-
         # GH 13098
         s = Series([1, 2, 3, 4, np.nan])
         result = s.quantile(0.5)
@@ -183,11 +185,10 @@ class TestSeriesQuantile:
     def test_quantile_sparse(self, values, dtype):
         ser = Series(values, dtype=dtype)
         result = ser.quantile([0.5])
-        expected = Series(np.asarray(ser)).quantile([0.5])
+        expected = Series(np.asarray(ser)).quantile([0.5]).astype("Sparse[float]")
         tm.assert_series_equal(result, expected)
 
     def test_quantile_empty(self):
-
         # floats
         s = Series([], dtype="float64")
 

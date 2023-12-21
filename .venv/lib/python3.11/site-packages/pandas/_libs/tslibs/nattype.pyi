@@ -3,6 +3,7 @@ from datetime import (
     timedelta,
     tzinfo as _tzinfo,
 )
+import typing
 
 import numpy as np
 
@@ -12,13 +13,17 @@ NaT: NaTType
 iNaT: int
 nat_strings: set[str]
 
-_NaTComparisonTypes = datetime | timedelta | Period | np.datetime64 | np.timedelta64
+_NaTComparisonTypes: typing.TypeAlias = (
+    datetime | timedelta | Period | np.datetime64 | np.timedelta64
+)
 
 class _NatComparison:
     def __call__(self, other: _NaTComparisonTypes) -> bool: ...
 
 class NaTType:
-    value: np.int64
+    _value: np.int64
+    @property
+    def value(self) -> int: ...
     @property
     def asm8(self) -> np.datetime64: ...
     def to_datetime64(self) -> np.datetime64: ...
@@ -127,3 +132,4 @@ class NaTType:
     __le__: _NatComparison
     __gt__: _NatComparison
     __ge__: _NatComparison
+    def as_unit(self, unit: str, round_ok: bool = ...) -> NaTType: ...

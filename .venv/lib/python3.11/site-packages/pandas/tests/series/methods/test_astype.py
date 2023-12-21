@@ -29,19 +29,31 @@ from pandas import (
 import pandas._testing as tm
 
 
+def rand_str(nchars: int) -> str:
+    """
+    Generate one random byte string.
+    """
+    RANDS_CHARS = np.array(
+        list(string.ascii_letters + string.digits), dtype=(np.str_, 1)
+    )
+    return "".join(np.random.default_rng(2).choice(RANDS_CHARS, nchars))
+
+
 class TestAstypeAPI:
-    def test_astype_unitless_dt64_deprecated(self):
+    def test_astype_unitless_dt64_raises(self):
         # GH#47844
         ser = Series(["1970-01-01", "1970-01-01", "1970-01-01"], dtype="datetime64[ns]")
+        df = ser.to_frame()
 
-        msg = "Passing unit-less datetime64 dtype to .astype is deprecated and "
-        with tm.assert_produces_warning(FutureWarning, match=msg):
-            res = ser.astype(np.datetime64)
-        tm.assert_series_equal(ser, res)
-
-        with tm.assert_produces_warning(FutureWarning, match=msg):
-            res = ser.astype("datetime64")
-        tm.assert_series_equal(ser, res)
+        msg = "Casting to unit-less dtype 'datetime64' is not supported"
+        with pytest.raises(TypeError, match=msg):
+            ser.astype(np.datetime64)
+        with pytest.raises(TypeError, match=msg):
+            df.astype(np.datetime64)
+        with pytest.raises(TypeError, match=msg):
+            ser.astype("datetime64")
+        with pytest.raises(TypeError, match=msg):
+            df.astype("datetime64")
 
     def test_arg_for_errors_in_astype(self):
         # see GH#14878
@@ -95,6 +107,20 @@ class TestAstypeAPI:
 
 
 class TestAstype:
+    def test_astype_mixed_object_to_dt64tz(self):
+        # pre-2.0 this raised ValueError bc of tz mismatch
+        # xref GH#32581
+        ts = Timestamp("2016-01-04 05:06:07", tz="US/Pacific")
+        ts2 = ts.tz_convert("Asia/Tokyo")
+
+        ser = Series([ts, ts2], dtype=object)
+        res = ser.astype("datetime64[ns, Europe/Brussels]")
+        expected = Series(
+            [ts.tz_convert("Europe/Brussels"), ts2.tz_convert("Europe/Brussels")],
+            dtype="datetime64[ns, Europe/Brussels]",
+        )
+        tm.assert_series_equal(res, expected)
+
     @pytest.mark.parametrize("dtype", np.typecodes["All"])
     def test_astype_empty_constructor_equality(self, dtype):
         # see GH#15524
@@ -106,16 +132,15 @@ class TestAstype:
             "m",  # Generic timestamps raise a ValueError. Already tested.
         ):
             init_empty = Series([], dtype=dtype)
-            with tm.assert_produces_warning(FutureWarning):
-                as_type_empty = Series([]).astype(dtype)
+            as_type_empty = Series([]).astype(dtype)
             tm.assert_series_equal(init_empty, as_type_empty)
 
     @pytest.mark.parametrize("dtype", [str, np.str_])
     @pytest.mark.parametrize(
         "series",
         [
-            Series([string.digits * 10, tm.rands(63), tm.rands(64), tm.rands(1000)]),
-            Series([string.digits * 10, tm.rands(63), tm.rands(64), np.nan, 1.0]),
+            Series([string.digits * 10, rand_str(63), rand_str(64), rand_str(1000)]),
+            Series([string.digits * 10, rand_str(63), rand_str(64), np.nan, 1.0]),
         ],
     )
     def test_astype_str_map(self, dtype, series):
@@ -132,8 +157,8 @@ class TestAstype:
     def test_astype_no_pandas_dtype(self):
         # https://github.com/pandas-dev/pandas/pull/24866
         ser = Series([1, 2], dtype="int64")
-        # Don't have PandasDtype in the public API, so we use `.array.dtype`,
-        # which is a PandasDtype.
+        # Don't have NumpyEADtype in the public API, so we use `.array.dtype`,
+        # which is a NumpyEADtype.
         result = ser.astype(ser.array.dtype)
         tm.assert_series_equal(result, ser)
 
@@ -211,15 +236,14 @@ class TestAstype:
         tm.assert_series_equal(result, expected)
 
         # astype - datetime64[ns, tz]
-        with tm.assert_produces_warning(FutureWarning):
+        msg = "Cannot use .astype to convert from timezone-naive"
+        with pytest.raises(TypeError, match=msg):
             # dt64->dt64tz astype deprecated
-            result = Series(ser.values).astype("datetime64[ns, US/Eastern]")
-        tm.assert_series_equal(result, ser)
+            Series(ser.values).astype("datetime64[ns, US/Eastern]")
 
-        with tm.assert_produces_warning(FutureWarning):
+        with pytest.raises(TypeError, match=msg):
             # dt64->dt64tz astype deprecated
-            result = Series(ser.values).astype(ser.dtype)
-        tm.assert_series_equal(result, ser)
+            Series(ser.values).astype(ser.dtype)
 
         result = ser.astype("datetime64[ns, CET]")
         expected = Series(date_range("20130101 06:00:00", periods=3, tz="CET"))
@@ -267,7 +291,7 @@ class TestAstype:
             pytest.param(
                 ["x", "y", "z"],
                 "string[pyarrow]",
-                marks=td.skip_if_no("pyarrow", min_version="1.0.0"),
+                marks=td.skip_if_no("pyarrow"),
             ),
             (["x", "y", "z"], "category"),
             (3 * [Timestamp("2020-01-01", tz="UTC")], None),
@@ -312,7 +336,7 @@ class TestAstype:
 
     @pytest.mark.parametrize("dtype", ["float32", "float64", "int64", "int32"])
     def test_astype(self, dtype):
-        ser = Series(np.random.randn(5), name="foo")
+        ser = Series(np.random.default_rng(2).standard_normal(5), name="foo")
         as_typed = ser.astype(dtype)
 
         assert as_typed.dtype == dtype
@@ -338,13 +362,24 @@ class TestAstype:
     def test_astype_float_to_uint_negatives_raise(
         self, float_numpy_dtype, any_unsigned_int_numpy_dtype
     ):
-        # GH#45151
-        # TODO: same for EA float/uint dtypes
+        # GH#45151 We don't cast negative numbers to nonsense values
+        # TODO: same for EA float/uint dtypes, signed integers?
         arr = np.arange(5).astype(float_numpy_dtype) - 3  # includes negatives
         ser = Series(arr)
 
-        with pytest.raises(ValueError, match="losslessly"):
+        msg = "Cannot losslessly cast from .* to .*"
+        with pytest.raises(ValueError, match=msg):
             ser.astype(any_unsigned_int_numpy_dtype)
+
+        with pytest.raises(ValueError, match=msg):
+            ser.to_frame().astype(any_unsigned_int_numpy_dtype)
+
+        with pytest.raises(ValueError, match=msg):
+            # We currently catch and re-raise in Index.astype
+            Index(ser).astype(any_unsigned_int_numpy_dtype)
+
+        with pytest.raises(ValueError, match=msg):
+            ser.array.astype(any_unsigned_int_numpy_dtype)
 
     def test_astype_cast_object_int(self):
         arr = Series(["1", "2", "3", "4"], dtype=object)
@@ -357,17 +392,23 @@ class TestAstype:
         # default encoding to utf-8
         digits = string.digits
         test_series = [
-            Series([digits * 10, tm.rands(63), tm.rands(64), tm.rands(1000)]),
+            Series([digits * 10, rand_str(63), rand_str(64), rand_str(1000)]),
             Series(["データーサイエンス、お前はもう死んでいる"]),
         ]
 
         former_encoding = None
 
         if sys.getdefaultencoding() == "utf-8":
-            test_series.append(Series(["野菜食べないとやばい".encode()]))
+            # GH#45326 as of 2.0 Series.astype matches Index.astype by handling
+            #  bytes with obj.decode() instead of str(obj)
+            item = "野菜食べないとやばい"
+            ser = Series([item.encode()])
+            result = ser.astype(np.str_)
+            expected = Series([item])
+            tm.assert_series_equal(result, expected)
 
         for ser in test_series:
-            res = ser.astype("unicode")
+            res = ser.astype(np.str_)
             expec = ser.map(str)
             tm.assert_series_equal(res, expec)
 
@@ -395,10 +436,7 @@ class TestAstype:
     def test_astype_ea_to_datetimetzdtype(self, dtype):
         # GH37553
         ser = Series([4, 0, 9], dtype=dtype)
-        warn = FutureWarning if ser.dtype.kind == "f" else None
-        msg = "with a timezone-aware dtype and floating-dtype data"
-        with tm.assert_produces_warning(warn, match=msg):
-            result = ser.astype(DatetimeTZDtype(tz="US/Pacific"))
+        result = ser.astype(DatetimeTZDtype(tz="US/Pacific"))
 
         expected = Series(
             {
@@ -408,24 +446,9 @@ class TestAstype:
             }
         )
 
-        if dtype in tm.FLOAT_EA_DTYPES:
-            expected = Series(
-                {
-                    0: Timestamp(
-                        "1970-01-01 00:00:00.000000004-08:00", tz="US/Pacific"
-                    ),
-                    1: Timestamp(
-                        "1970-01-01 00:00:00.000000000-08:00", tz="US/Pacific"
-                    ),
-                    2: Timestamp(
-                        "1970-01-01 00:00:00.000000009-08:00", tz="US/Pacific"
-                    ),
-                }
-            )
-
         tm.assert_series_equal(result, expected)
 
-    def test_astype_retain_Attrs(self, any_numpy_dtype):
+    def test_astype_retain_attrs(self, any_numpy_dtype):
         # GH#44414
         ser = Series([0, 1, 2, 3])
         ser.attrs["Location"] = "Michigan"
@@ -458,9 +481,7 @@ class TestAstypeString:
     def test_astype_string_to_extension_dtype_roundtrip(
         self, data, dtype, request, nullable_string_dtype
     ):
-        if dtype == "boolean" or (
-            dtype in ("datetime64[ns]", "timedelta64[ns]") and NaT in data
-        ):
+        if dtype == "boolean":
             mark = pytest.mark.xfail(
                 reason="TODO StringArray.astype() with missing values #GH40566"
             )
@@ -478,7 +499,7 @@ class TestAstypeString:
 class TestAstypeCategorical:
     def test_astype_categorical_to_other(self):
         cat = Categorical([f"{i} - {i + 499}" for i in range(0, 10000, 500)])
-        ser = Series(np.random.RandomState(0).randint(0, 10000, 100)).sort_values()
+        ser = Series(np.random.default_rng(2).integers(0, 10000, 100)).sort_values()
         ser = cut(ser, range(0, 10500, 500), right=False, labels=cat)
 
         expected = ser
@@ -521,7 +542,7 @@ class TestAstypeCategorical:
     def test_astype_categorical_invalid_conversions(self):
         # invalid conversion (these are NOT a dtype)
         cat = Categorical([f"{i} - {i + 499}" for i in range(0, 10000, 500)])
-        ser = Series(np.random.randint(0, 10000, 100)).sort_values()
+        ser = Series(np.random.default_rng(2).integers(0, 10000, 100)).sort_values()
         ser = cut(ser, range(0, 10500, 500), right=False, labels=cat)
 
         msg = (

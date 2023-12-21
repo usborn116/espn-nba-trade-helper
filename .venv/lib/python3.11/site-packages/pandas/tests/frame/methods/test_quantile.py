@@ -1,11 +1,6 @@
 import numpy as np
 import pytest
 
-from pandas.compat.numpy import (
-    np_percentile_argname,
-    np_version_under1p21,
-)
-
 import pandas as pd
 from pandas import (
     DataFrame,
@@ -25,37 +20,6 @@ def interp_method(request):
 
 
 class TestDataFrameQuantile:
-    @pytest.mark.parametrize(
-        "non_num_col",
-        [
-            pd.date_range("2014-01-01", periods=3, freq="m"),
-            ["a", "b", "c"],
-            [DataFrame, Series, Timestamp],
-        ],
-    )
-    def test_numeric_only_default_false_warning(
-        self, non_num_col, interp_method, request, using_array_manager
-    ):
-        # GH #7308
-        interpolation, method = interp_method
-        df = DataFrame({"A": [1, 2, 3], "B": [2, 3, 4]})
-        df["C"] = non_num_col
-
-        expected = Series(
-            [2.0, 3.0],
-            index=["A", "B"],
-            name=0.5,
-        )
-        if interpolation == "nearest":
-            expected = expected.astype(np.int64)
-        if method == "table" and using_array_manager:
-            request.node.add_marker(
-                pytest.mark.xfail(reason="Axis name incorrectly set.")
-            )
-        with tm.assert_produces_warning(FutureWarning, match="numeric_only"):
-            result = df.quantile(0.5, interpolation=interpolation, method=method)
-        tm.assert_series_equal(result, expected)
-
     @pytest.mark.parametrize(
         "df,expected",
         [
@@ -78,7 +42,7 @@ class TestDataFrameQuantile:
         # GH#17198
         # GH#24600
         result = df.quantile()
-
+        expected = expected.astype("Sparse[float]")
         tm.assert_series_equal(result, expected)
 
     def test_quantile(
@@ -139,8 +103,7 @@ class TestDataFrameQuantile:
         rs = df.quantile(
             0.5, numeric_only=True, interpolation=interpolation, method=method
         )
-        with tm.assert_produces_warning(FutureWarning, match="Select only valid"):
-            xp = df.median().rename(0.5)
+        xp = df.median(numeric_only=True).rename(0.5)
         if interpolation == "nearest":
             xp = (xp + 0.5).astype(np.int64)
         if method == "table" and using_array_manager:
@@ -214,7 +177,6 @@ class TestDataFrameQuantile:
         tm.assert_series_equal(result, expected)
 
     def test_quantile_axis_mixed(self, interp_method, request, using_array_manager):
-
         # mixed on axis=1
         interpolation, method = interp_method
         df = DataFrame(
@@ -298,7 +260,7 @@ class TestDataFrameQuantile:
             np.array([[1, 2, 3], [2, 3, 4]]),
             0.5,
             axis=0,
-            **{np_percentile_argname: "nearest"},
+            method="nearest",
         )
         expected = Series(exp, index=[1, 2, 3], name=0.5, dtype="int64")
         tm.assert_series_equal(result, expected)
@@ -312,7 +274,7 @@ class TestDataFrameQuantile:
             np.array([[1.0, 2.0, 3.0], [2.0, 3.0, 4.0]]),
             0.5,
             axis=0,
-            **{np_percentile_argname: "nearest"},
+            method="nearest",
         )
         expected = Series(exp, index=[1, 2, 3], name=0.5, dtype="float64")
         tm.assert_series_equal(result, expected)
@@ -452,7 +414,7 @@ class TestDataFrameQuantile:
         tm.assert_series_equal(result, expected)
 
         result = df[["a", "c"]].quantile([0.5], numeric_only=True)
-        expected = DataFrame(index=[0.5])
+        expected = DataFrame(index=[0.5], columns=[])
         tm.assert_frame_equal(result, expected)
 
     @pytest.mark.parametrize(
@@ -483,7 +445,7 @@ class TestDataFrameQuantile:
             interpolation=interpolation,
             method=method,
         )
-        expected = DataFrame(index=[0.5])
+        expected = DataFrame(index=[0.5], columns=[])
         tm.assert_frame_equal(res, expected)
 
     @pytest.mark.parametrize("invalid", [-1, 2, [0.5, -1], [0.5, 2]])
@@ -770,6 +732,11 @@ class TestDataFrameQuantile:
             0.5, numeric_only=False, interpolation=interpolation, method=method
         )
         exp = exp.astype(object)
+        if interpolation == "nearest":
+            # GH#18463 TODO: would we prefer NaTs here?
+            msg = "The 'downcast' keyword in fillna is deprecated"
+            with tm.assert_produces_warning(FutureWarning, match=msg):
+                exp = exp.fillna(np.nan, downcast=False)
         tm.assert_series_equal(res, exp)
 
         # both dt64tz
@@ -799,19 +766,29 @@ class TestDataFrameQuantile:
         expected.columns.name = "captain tightpants"
         tm.assert_frame_equal(result, expected)
 
-    def test_quantile_item_cache(self, using_array_manager, interp_method):
+    def test_quantile_item_cache(
+        self, using_array_manager, interp_method, using_copy_on_write
+    ):
         # previous behavior incorrect retained an invalid _item_cache entry
         interpolation, method = interp_method
-        df = DataFrame(np.random.randn(4, 3), columns=["A", "B", "C"])
+        df = DataFrame(
+            np.random.default_rng(2).standard_normal((4, 3)), columns=["A", "B", "C"]
+        )
         df["D"] = df["A"] * 2
         ser = df["A"]
         if not using_array_manager:
             assert len(df._mgr.blocks) == 2
 
         df.quantile(numeric_only=False, interpolation=interpolation, method=method)
-        ser.values[0] = 99
 
-        assert df.iloc[0, 0] == df["A"][0]
+        if using_copy_on_write:
+            ser.iloc[0] = 99
+            assert df.iloc[0, 0] == df["A"][0]
+            assert df.iloc[0, 0] != 99
+        else:
+            ser.values[0] = 99
+            assert df.iloc[0, 0] == df["A"][0]
+            assert df.iloc[0, 0] == 99
 
     def test_invalid_method(self):
         with pytest.raises(ValueError, match="Invalid method: foo"):
@@ -865,19 +842,13 @@ class TestQuantileExtensionDtype:
         return result
 
     def test_quantile_ea(self, request, obj, index):
-
         # result should be invariant to shuffling
         indexer = np.arange(len(index), dtype=np.intp)
-        np.random.shuffle(indexer)
+        np.random.default_rng(2).shuffle(indexer)
         obj = obj.iloc[indexer]
 
         qs = [0.5, 0, 1]
         result = self.compute_quantile(obj, qs)
-
-        if np_version_under1p21 and index.dtype == "timedelta64[ns]":
-            msg = "failed on Numpy 1.20.3; TypeError: data type 'Int64' not understood"
-            mark = pytest.mark.xfail(reason=msg, raises=TypeError)
-            request.node.add_marker(mark)
 
         exp_dtype = index.dtype
         if index.dtype == "Int64":
@@ -893,13 +864,12 @@ class TestQuantileExtensionDtype:
         tm.assert_equal(result, expected)
 
     def test_quantile_ea_with_na(self, obj, index):
-
         obj.iloc[0] = index._na_value
         obj.iloc[-1] = index._na_value
 
         # result should be invariant to shuffling
         indexer = np.arange(len(index), dtype=np.intp)
-        np.random.shuffle(indexer)
+        np.random.default_rng(2).shuffle(indexer)
         obj = obj.iloc[indexer]
 
         qs = [0.5, 0, 1]
@@ -912,18 +882,14 @@ class TestQuantileExtensionDtype:
         expected = type(obj)(expected)
         tm.assert_equal(result, expected)
 
-    # TODO(GH#39763): filtering can be removed after GH#39763 is fixed
-    @pytest.mark.filterwarnings("ignore:Using .astype to convert:FutureWarning")
     def test_quantile_ea_all_na(self, request, obj, index):
         obj.iloc[:] = index._na_value
-
-        # TODO(ArrayManager): this casting should be unnecessary after GH#39763 is fixed
-        obj = obj.astype(index.dtype)
+        # Check dtypes were preserved; this was once a problem see GH#39763
         assert np.all(obj.dtypes == index.dtype)
 
         # result should be invariant to shuffling
         indexer = np.arange(len(index), dtype=np.intp)
-        np.random.shuffle(indexer)
+        np.random.default_rng(2).shuffle(indexer)
         obj = obj.iloc[indexer]
 
         qs = [0.5, 0, 1]
@@ -939,16 +905,11 @@ class TestQuantileExtensionDtype:
 
         # result should be invariant to shuffling
         indexer = np.arange(len(index), dtype=np.intp)
-        np.random.shuffle(indexer)
+        np.random.default_rng(2).shuffle(indexer)
         obj = obj.iloc[indexer]
 
         qs = 0.5
         result = self.compute_quantile(obj, qs)
-
-        if np_version_under1p21 and index.dtype == "timedelta64[ns]":
-            msg = "failed on Numpy 1.20.3; TypeError: data type 'Int64' not understood"
-            mark = pytest.mark.xfail(reason=msg, raises=TypeError)
-            request.node.add_marker(mark)
 
         exp_dtype = index.dtype
         if index.dtype == "Int64":

@@ -4,6 +4,8 @@ import re
 import numpy as np
 import pytest
 
+from pandas.core.dtypes.dtypes import ArrowDtype
+
 from pandas import (
     DataFrame,
     Index,
@@ -51,7 +53,7 @@ def test_extract_expand_False_mixed_object():
     # single group
     result = ser.str.extract(".*(BAD[_]+).*BAD", expand=False)
     expected = Series(
-        ["BAD_", np.nan, "BAD_", np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
+        ["BAD_", np.nan, "BAD_", np.nan, np.nan, np.nan, None, np.nan, np.nan]
     )
     tm.assert_series_equal(result, expected)
 
@@ -174,22 +176,24 @@ def test_extract_expand_capture_groups(any_string_dtype):
     tm.assert_frame_equal(result, expected)
 
 
-def test_extract_expand_capture_groups_index(request, index, any_string_dtype):
+def test_extract_expand_capture_groups_index(index, any_string_dtype):
     # https://github.com/pandas-dev/pandas/issues/6348
     # not passing index to the extractor
     data = ["A1", "B2", "C"]
 
-    if len(index) < len(data):
-        request.node.add_marker(pytest.mark.xfail(reason="Index too short."))
+    if len(index) == 0:
+        pytest.skip("Test requires len(index) > 0")
+    while len(index) < len(data):
+        index = index.repeat(2)
 
     index = index[: len(data)]
-    s = Series(data, index=index, dtype=any_string_dtype)
+    ser = Series(data, index=index, dtype=any_string_dtype)
 
-    result = s.str.extract(r"(\d)", expand=False)
+    result = ser.str.extract(r"(\d)", expand=False)
     expected = Series(["1", "2", np.nan], index=index, dtype=any_string_dtype)
     tm.assert_series_equal(result, expected)
 
-    result = s.str.extract(r"(?P<letter>\D)(?P<number>\d)?", expand=False)
+    result = ser.str.extract(r"(?P<letter>\D)(?P<number>\d)?", expand=False)
     expected = DataFrame(
         [["A", "1"], ["B", "2"], ["C", np.nan]],
         columns=["letter", "number"],
@@ -320,7 +324,6 @@ def test_extract_series(name, any_string_dtype):
 
 
 def test_extract_optional_groups(any_string_dtype):
-
     # two normal groups, one non-capturing group
     s = Series(["A11", "B22", "C33"], dtype=any_string_dtype)
     result = s.str.extract("([AB])([123])(?:[123])", expand=True)
@@ -603,7 +606,6 @@ def test_extractall_stringindex(any_string_dtype):
             Index(["a1a2", "b1", "c1"]),
             Index(["a1a2", "b1", "c1"], name="xxx"),
         ]:
-
             result = idx.str.extractall(r"[ab](?P<digit>\d)")
             tm.assert_frame_equal(result, expected)
 
@@ -706,3 +708,12 @@ def test_extractall_same_as_extract_subject_index(any_string_dtype):
     has_match_index = s.str.extractall(pattern_one_noname)
     no_match_index = has_match_index.xs(0, level="match")
     tm.assert_frame_equal(extract_one_noname, no_match_index)
+
+
+def test_extractall_preserves_dtype():
+    # Ensure that when extractall is called on a series with specific dtypes set, that
+    # the dtype is preserved in the resulting DataFrame's column.
+    pa = pytest.importorskip("pyarrow")
+
+    result = Series(["abc", "ab"], dtype=ArrowDtype(pa.string())).str.extractall("(ab)")
+    assert result.dtypes[0] == "string[pyarrow]"

@@ -30,7 +30,8 @@ def test_detect_chained_assignment(using_copy_on_write):
     zed = DataFrame(events, index=["a", "b"], columns=multiind)
 
     if using_copy_on_write:
-        zed["eyes"]["right"].fillna(value=555, inplace=True)
+        with tm.raises_chained_assignment_error():
+            zed["eyes"]["right"].fillna(value=555, inplace=True)
     else:
         msg = "A value is trying to be set on a copy of a slice from a DataFrame"
         with pytest.raises(SettingWithCopyError, match=msg):
@@ -41,7 +42,7 @@ def test_detect_chained_assignment(using_copy_on_write):
 def test_cache_updating(using_copy_on_write):
     # 5216
     # make sure that we don't try to set a dead cache
-    a = np.random.rand(10, 3)
+    a = np.random.default_rng(2).random((10, 3))
     df = DataFrame(a, columns=["x", "y", "z"])
     df_original = df.copy()
     tuples = [(i, j) for i in range(5) for j in range(2)]
@@ -50,11 +51,13 @@ def test_cache_updating(using_copy_on_write):
 
     # setting via chained assignment
     # but actually works, since everything is a view
-    df.loc[0]["z"].iloc[0] = 1.0
-    result = df.loc[(0, 0), "z"]
     if using_copy_on_write:
-        assert result == df_original.loc[0, "z"]
+        with tm.raises_chained_assignment_error():
+            df.loc[0]["z"].iloc[0] = 1.0
+        assert df.loc[(0, 0), "z"] == df_original.loc[0, "z"]
     else:
+        df.loc[0]["z"].iloc[0] = 1.0
+        result = df.loc[(0, 0), "z"]
         assert result == 1
 
     # correct setting
@@ -68,13 +71,11 @@ def test_indexer_caching():
     # GH5727
     # make sure that indexers are in the _internal_names_set
     n = 1000001
-    arrays = (range(n), range(n))
-    index = MultiIndex.from_tuples(zip(*arrays))
+    index = MultiIndex.from_arrays([np.arange(n), np.arange(n)])
     s = Series(np.zeros(n), index=index)
     str(s)
 
     # setitem
     expected = Series(np.ones(n), index=index)
-    s = Series(np.zeros(n), index=index)
     s[s == 0] = 1
     tm.assert_series_equal(s, expected)

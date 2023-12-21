@@ -92,7 +92,8 @@ class TestIteration:
             tm.assert_series_equal(ser, expected)
 
         df = DataFrame(
-            {"floats": np.random.randn(5), "ints": range(5)}, columns=["floats", "ints"]
+            {"floats": np.random.default_rng(2).standard_normal(5), "ints": range(5)},
+            columns=["floats", "ints"],
         )
 
         for tup in df.itertuples(index=False):
@@ -138,7 +139,6 @@ class TestIteration:
         assert hasattr(result_255_columns, "_fields")
 
     def test_sequence_like_with_categorical(self):
-
         # GH#7839
         # make sure can iterate
         df = DataFrame(
@@ -159,4 +159,4 @@ class TestIteration:
             str(s)
 
         for c, col in df.items():
-            str(s)
+            str(col)

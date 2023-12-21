@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import functools
 from typing import (
     TYPE_CHECKING,
@@ -37,6 +36,8 @@ from pandas.tseries.frequencies import (
 )
 
 if TYPE_CHECKING:
+    from datetime import timedelta
+
     from matplotlib.axes import Axes
 
     from pandas import (
@@ -93,7 +94,7 @@ def _is_sup(f1: str, f2: str) -> bool:
     )
 
 
-def _upsample_others(ax: Axes, freq, kwargs):
+def _upsample_others(ax: Axes, freq, kwargs) -> None:
     legend = ax.get_legend()
     lines, labels = _replot_ax(ax, freq, kwargs)
     _replot_ax(ax, freq, kwargs)
@@ -146,7 +147,7 @@ def _replot_ax(ax: Axes, freq, kwargs):
     return lines, labels
 
 
-def decorate_axes(ax: Axes, freq, kwargs):
+def decorate_axes(ax: Axes, freq, kwargs) -> None:
     """Initialize axes for time-series plotting"""
     if not hasattr(ax, "_plot_data"):
         ax._plot_data = []
@@ -216,9 +217,9 @@ def use_dynamic_x(ax: Axes, data: DataFrame | Series) -> bool:
 
     if freq is None:  # convert irregular if axes has freq info
         freq = ax_freq
-    else:  # do not use tsplot if irregular was plotted first
-        if (ax_freq is None) and (len(ax.get_lines()) > 0):
-            return False
+    # do not use tsplot if irregular was plotted first
+    elif (ax_freq is None) and (len(ax.get_lines()) > 0):
+        return False
 
     if freq is None:
         return False
@@ -275,10 +276,22 @@ def maybe_convert_index(ax: Axes, data):
 
         freq_str = _get_period_alias(freq)
 
-        if isinstance(data.index, ABCDatetimeIndex):
-            data = data.tz_localize(None).to_period(freq=freq_str)
-        elif isinstance(data.index, ABCPeriodIndex):
-            data.index = data.index.asfreq(freq=freq_str)
+        import warnings
+
+        with warnings.catch_warnings():
+            # suppress Period[B] deprecation warning
+            # TODO: need to find an alternative to this before the deprecation
+            #  is enforced!
+            warnings.filterwarnings(
+                "ignore",
+                r"PeriodDtype\[B\] is deprecated",
+                category=FutureWarning,
+            )
+
+            if isinstance(data.index, ABCDatetimeIndex):
+                data = data.tz_localize(None).to_period(freq=freq_str)
+            elif isinstance(data.index, ABCPeriodIndex):
+                data.index = data.index.asfreq(freq=freq_str)
     return data
 
 
@@ -306,7 +319,6 @@ def format_dateaxis(subplot, freq, index) -> None:
     # Note: DatetimeIndex does not use this
     # interface. DatetimeIndex uses matplotlib.date directly
     if isinstance(index, ABCPeriodIndex):
-
         majlocator = TimeSeries_DateLocator(
             freq, dynamic_mode=True, minor_locator=False, plot_obj=subplot
         )

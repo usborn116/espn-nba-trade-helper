@@ -67,7 +67,12 @@ class TestSeriesRepr:
 
     @pytest.mark.parametrize("args", [(), (0, -1)])
     def test_float_range(self, args):
-        str(Series(np.random.randn(1000), index=np.arange(1000, *args)))
+        str(
+            Series(
+                np.random.default_rng(2).standard_normal(1000),
+                index=np.arange(1000, *args),
+            )
+        )
 
     def test_empty_object(self):
         # empty
@@ -78,7 +83,7 @@ class TestSeriesRepr:
         str(string_series.astype(int))
 
         # with NaNs
-        string_series[5:7] = np.NaN
+        string_series[5:7] = np.nan
         str(string_series)
 
     def test_object(self, object_series):
@@ -114,14 +119,16 @@ class TestSeriesRepr:
 
     def test_tuple_name(self):
         biggie = Series(
-            np.random.randn(1000), index=np.arange(1000), name=("foo", "bar", "baz")
+            np.random.default_rng(2).standard_normal(1000),
+            index=np.arange(1000),
+            name=("foo", "bar", "baz"),
         )
         repr(biggie)
 
     @pytest.mark.parametrize("arg", [100, 1001])
     def test_tidy_repr_name_0(self, arg):
         # tidy repr
-        ser = Series(np.random.randn(arg), name=0)
+        ser = Series(np.random.default_rng(2).standard_normal(arg), name=0)
         rep_str = repr(ser)
         assert "Name: 0" in rep_str
 
@@ -149,7 +156,12 @@ class TestSeriesRepr:
         repr(a)  # should not raise exception
 
     def test_repr_bool_fails(self, capsys):
-        s = Series([DataFrame(np.random.randn(2, 2)) for i in range(5)])
+        s = Series(
+            [
+                DataFrame(np.random.default_rng(2).standard_normal((2, 2)))
+                for i in range(5)
+            ]
+        )
 
         # It works (with no Cython exception barf)!
         repr(s)
@@ -197,28 +209,30 @@ class TestSeriesRepr:
         index = Index(
             [datetime(2000, 1, 1) + timedelta(i) for i in range(1000)], dtype=object
         )
-        ts = Series(np.random.randn(len(index)), index)
+        ts = Series(np.random.default_rng(2).standard_normal(len(index)), index)
         repr(ts)
 
         ts = tm.makeTimeSeries(1000)
         assert repr(ts).splitlines()[-1].startswith("Freq:")
 
-        ts2 = ts.iloc[np.random.randint(0, len(ts) - 1, 400)]
+        ts2 = ts.iloc[np.random.default_rng(2).integers(0, len(ts) - 1, 400)]
         repr(ts2).splitlines()[-1]
 
-    @pytest.mark.filterwarnings("ignore::FutureWarning")
     def test_latex_repr(self):
+        pytest.importorskip("jinja2")  # uses Styler implementation
         result = r"""\begin{tabular}{ll}
 \toprule
-{} &         0 \\
+ & 0 \\
 \midrule
-0 &  $\alpha$ \\
-1 &         b \\
-2 &         c \\
+0 & $\alpha$ \\
+1 & b \\
+2 & c \\
 \bottomrule
 \end{tabular}
 """
-        with option_context("display.latex.escape", False, "display.latex.repr", True):
+        with option_context(
+            "styler.format.escape", None, "styler.render.repr", "latex"
+        ):
             s = Series([r"$\alpha$", "b", "c"])
             assert result == s._repr_latex_()
 
@@ -239,7 +253,7 @@ class TestSeriesRepr:
         repr(ts)
 
     def test_series_repr_nat(self):
-        series = Series([0, 1000, 2000, pd.NaT.value], dtype="M8[ns]")
+        series = Series([0, 1000, 2000, pd.NaT._value], dtype="M8[ns]")
 
         result = repr(series)
         expected = (
@@ -288,7 +302,7 @@ class TestCategoricalRepr:
         a = Series(Categorical([1, 2, 3, 4]))
         exp = (
             "0    1\n1    2\n2    3\n3    4\n"
-            + "dtype: category\nCategories (4, int64): [1, 2, 3, 4]"
+            "dtype: category\nCategories (4, int64): [1, 2, 3, 4]"
         )
 
         assert exp == a.__str__()
@@ -296,9 +310,9 @@ class TestCategoricalRepr:
         a = Series(Categorical(["a", "b"] * 25))
         exp = (
             "0     a\n1     b\n"
-            + "     ..\n"
-            + "48    a\n49    b\n"
-            + "Length: 50, dtype: category\nCategories (2, object): ['a', 'b']"
+            "     ..\n"
+            "48    a\n49    b\n"
+            "Length: 50, dtype: category\nCategories (2, object): ['a', 'b']"
         )
         with option_context("display.max_rows", 5):
             assert exp == repr(a)
@@ -306,7 +320,8 @@ class TestCategoricalRepr:
         levs = list("abcdefghijklmnopqrstuvwxyz")
         a = Series(Categorical(["a", "b"], categories=levs, ordered=True))
         exp = (
-            "0    a\n1    b\n" + "dtype: category\n"
+            "0    a\n1    b\n"
+            "dtype: category\n"
             "Categories (26, object): ['a' < 'b' < 'c' < 'd' ... 'w' < 'x' < 'y' < 'z']"
         )
         assert exp == a.__str__()
@@ -322,7 +337,7 @@ Categories (3, int64): [1, 2, 3]"""
         assert repr(s) == exp
 
         s = Series(Categorical(np.arange(10)))
-        exp = """0    0
+        exp = f"""0    0
 1    1
 2    2
 3    3
@@ -333,7 +348,7 @@ Categories (3, int64): [1, 2, 3]"""
 8    8
 9    9
 dtype: category
-Categories (10, int64): [0, 1, 2, 3, ..., 6, 7, 8, 9]"""
+Categories (10, {np.dtype(int)}): [0, 1, 2, 3, ..., 6, 7, 8, 9]"""
 
         assert repr(s) == exp
 
@@ -348,7 +363,7 @@ Categories (3, int64): [1 < 2 < 3]"""
         assert repr(s) == exp
 
         s = Series(Categorical(np.arange(10), ordered=True))
-        exp = """0    0
+        exp = f"""0    0
 1    1
 2    2
 3    3
@@ -359,7 +374,7 @@ Categories (3, int64): [1 < 2 < 3]"""
 8    8
 9    9
 dtype: category
-Categories (10, int64): [0 < 1 < 2 < 3 ... 6 < 7 < 8 < 9]"""
+Categories (10, {np.dtype(int)}): [0 < 1 < 2 < 3 ... 6 < 7 < 8 < 9]"""
 
         assert repr(s) == exp
 
@@ -373,7 +388,7 @@ Categories (10, int64): [0 < 1 < 2 < 3 ... 6 < 7 < 8 < 9]"""
 4   2011-01-01 13:00:00
 dtype: category
 Categories (5, datetime64[ns]): [2011-01-01 09:00:00, 2011-01-01 10:00:00, 2011-01-01 11:00:00,
-                                 2011-01-01 12:00:00, 2011-01-01 13:00:00]"""  # noqa:E501
+                                 2011-01-01 12:00:00, 2011-01-01 13:00:00]"""  # noqa: E501
 
         assert repr(s) == exp
 
@@ -387,7 +402,7 @@ Categories (5, datetime64[ns]): [2011-01-01 09:00:00, 2011-01-01 10:00:00, 2011-
 dtype: category
 Categories (5, datetime64[ns, US/Eastern]): [2011-01-01 09:00:00-05:00, 2011-01-01 10:00:00-05:00,
                                              2011-01-01 11:00:00-05:00, 2011-01-01 12:00:00-05:00,
-                                             2011-01-01 13:00:00-05:00]"""  # noqa:E501
+                                             2011-01-01 13:00:00-05:00]"""  # noqa: E501
 
         assert repr(s) == exp
 
@@ -401,7 +416,7 @@ Categories (5, datetime64[ns, US/Eastern]): [2011-01-01 09:00:00-05:00, 2011-01-
 4   2011-01-01 13:00:00
 dtype: category
 Categories (5, datetime64[ns]): [2011-01-01 09:00:00 < 2011-01-01 10:00:00 < 2011-01-01 11:00:00 <
-                                 2011-01-01 12:00:00 < 2011-01-01 13:00:00]"""  # noqa:E501
+                                 2011-01-01 12:00:00 < 2011-01-01 13:00:00]"""  # noqa: E501
 
         assert repr(s) == exp
 
@@ -415,7 +430,7 @@ Categories (5, datetime64[ns]): [2011-01-01 09:00:00 < 2011-01-01 10:00:00 < 201
 dtype: category
 Categories (5, datetime64[ns, US/Eastern]): [2011-01-01 09:00:00-05:00 < 2011-01-01 10:00:00-05:00 <
                                              2011-01-01 11:00:00-05:00 < 2011-01-01 12:00:00-05:00 <
-                                             2011-01-01 13:00:00-05:00]"""  # noqa:E501
+                                             2011-01-01 13:00:00-05:00]"""  # noqa: E501
 
         assert repr(s) == exp
 
@@ -429,7 +444,7 @@ Categories (5, datetime64[ns, US/Eastern]): [2011-01-01 09:00:00-05:00 < 2011-01
 4    2011-01-01 13:00
 dtype: category
 Categories (5, period[H]): [2011-01-01 09:00, 2011-01-01 10:00, 2011-01-01 11:00, 2011-01-01 12:00,
-                            2011-01-01 13:00]"""  # noqa:E501
+                            2011-01-01 13:00]"""  # noqa: E501
 
         assert repr(s) == exp
 
@@ -455,7 +470,7 @@ Categories (5, period[M]): [2011-01, 2011-02, 2011-03, 2011-04, 2011-05]"""
 4    2011-01-01 13:00
 dtype: category
 Categories (5, period[H]): [2011-01-01 09:00 < 2011-01-01 10:00 < 2011-01-01 11:00 < 2011-01-01 12:00 <
-                            2011-01-01 13:00]"""  # noqa:E501
+                            2011-01-01 13:00]"""  # noqa: E501
 
         assert repr(s) == exp
 
@@ -499,7 +514,7 @@ Categories (5, timedelta64[ns]): [1 days, 2 days, 3 days, 4 days, 5 days]"""
 dtype: category
 Categories (10, timedelta64[ns]): [0 days 01:00:00, 1 days 01:00:00, 2 days 01:00:00,
                                    3 days 01:00:00, ..., 6 days 01:00:00, 7 days 01:00:00,
-                                   8 days 01:00:00, 9 days 01:00:00]"""  # noqa:E501
+                                   8 days 01:00:00, 9 days 01:00:00]"""  # noqa: E501
 
         assert repr(s) == exp
 
@@ -531,6 +546,6 @@ Categories (5, timedelta64[ns]): [1 days < 2 days < 3 days < 4 days < 5 days]"""
 dtype: category
 Categories (10, timedelta64[ns]): [0 days 01:00:00 < 1 days 01:00:00 < 2 days 01:00:00 <
                                    3 days 01:00:00 ... 6 days 01:00:00 < 7 days 01:00:00 <
-                                   8 days 01:00:00 < 9 days 01:00:00]"""  # noqa:E501
+                                   8 days 01:00:00 < 9 days 01:00:00]"""  # noqa: E501
 
         assert repr(s) == exp

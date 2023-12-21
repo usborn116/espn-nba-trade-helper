@@ -1,10 +1,6 @@
 import numpy as np
 import pytest
 
-from pandas.core.dtypes.common import (
-    is_datetime64_dtype,
-    is_timedelta64_dtype,
-)
 from pandas.core.dtypes.dtypes import DatetimeTZDtype
 
 import pandas as pd
@@ -19,7 +15,7 @@ import pandas._testing as tm
 from pandas.core.arrays import (
     DatetimeArray,
     IntervalArray,
-    PandasArray,
+    NumpyExtensionArray,
     PeriodArray,
     SparseArray,
     TimedeltaArray,
@@ -62,6 +58,10 @@ class TestToIterable:
         # gh-13258
         # coerce iteration to underlying python / pandas types
         typ = index_or_series
+        if dtype == "float16" and issubclass(typ, pd.Index):
+            with pytest.raises(NotImplementedError, match="float16 indexes are not "):
+                typ([1], dtype=dtype)
+            return
         s = typ([1], dtype=dtype)
         result = method(s)[0]
         assert isinstance(result, rdtype)
@@ -102,10 +102,10 @@ class TestToIterable:
         # test if items yields the correct boxed scalars
         # this only applies to series
         s = Series([1], dtype=dtype)
-        _, result = list(s.items())[0]
+        _, result = next(iter(s.items()))
         assert isinstance(result, rdtype)
 
-        _, result = list(s.items())[0]
+        _, result = next(iter(s.items()))
         assert isinstance(result, rdtype)
 
     @pytest.mark.parametrize(
@@ -115,6 +115,10 @@ class TestToIterable:
         # gh-13236
         # coerce iteration to underlying python / pandas types
         typ = index_or_series
+        if dtype == "float16" and issubclass(typ, pd.Index):
+            with pytest.raises(NotImplementedError, match="float16 indexes are not "):
+                typ([1], dtype=dtype)
+            return
         s = typ([1], dtype=dtype)
         result = s.map(type)[0]
         if not isinstance(rdtype, tuple):
@@ -218,30 +222,30 @@ def test_values_consistent(arr, expected_type, dtype):
 def test_numpy_array(arr):
     ser = Series(arr)
     result = ser.array
-    expected = PandasArray(arr)
+    expected = NumpyExtensionArray(arr)
     tm.assert_extension_array_equal(result, expected)
 
 
 def test_numpy_array_all_dtypes(any_numpy_dtype):
     ser = Series(dtype=any_numpy_dtype)
     result = ser.array
-    if is_datetime64_dtype(any_numpy_dtype):
+    if np.dtype(any_numpy_dtype).kind == "M":
         assert isinstance(result, DatetimeArray)
-    elif is_timedelta64_dtype(any_numpy_dtype):
+    elif np.dtype(any_numpy_dtype).kind == "m":
         assert isinstance(result, TimedeltaArray)
     else:
-        assert isinstance(result, PandasArray)
+        assert isinstance(result, NumpyExtensionArray)
 
 
 @pytest.mark.parametrize(
     "arr, attr",
     [
         (pd.Categorical(["a", "b"]), "_codes"),
-        (pd.core.arrays.period_array(["2000", "2001"], freq="D"), "_data"),
+        (PeriodArray._from_sequence(["2000", "2001"], dtype="period[D]"), "_ndarray"),
         (pd.array([0, np.nan], dtype="Int64"), "_data"),
         (IntervalArray.from_breaks([0, 1]), "_left"),
         (SparseArray([0, 1]), "_sparse_values"),
-        (DatetimeArray(np.array([1, 2], dtype="datetime64[ns]")), "_data"),
+        (DatetimeArray(np.array([1, 2], dtype="datetime64[ns]")), "_ndarray"),
         # tz-aware Datetime
         (
             DatetimeArray(
@@ -250,20 +254,14 @@ def test_numpy_array_all_dtypes(any_numpy_dtype):
                 ),
                 dtype=DatetimeTZDtype(tz="US/Central"),
             ),
-            "_data",
+            "_ndarray",
         ),
     ],
 )
 def test_array(arr, attr, index_or_series, request):
     box = index_or_series
-    warn = None
-    if arr.dtype.name in ("Sparse[int64, 0]") and box is pd.Index:
-        mark = pytest.mark.xfail(reason="Index cannot yet store sparse dtype")
-        request.node.add_marker(mark)
-        warn = FutureWarning
 
-    with tm.assert_produces_warning(warn):
-        result = box(arr, copy=False).array
+    result = box(arr, copy=False).array
 
     if attr:
         arr = getattr(arr, attr)
@@ -334,10 +332,7 @@ def test_array_multiindex_raises():
 def test_to_numpy(arr, expected, index_or_series_or_array, request):
     box = index_or_series_or_array
 
-    warn = None
-    if index_or_series_or_array is pd.Index and isinstance(arr, SparseArray):
-        warn = FutureWarning
-    with tm.assert_produces_warning(warn):
+    with tm.assert_produces_warning(None):
         thing = box(arr)
 
     if arr.dtype.name == "int64" and box is pd.array:

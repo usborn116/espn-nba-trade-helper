@@ -46,7 +46,6 @@ class TestDataFrameUpdate:
         tm.assert_frame_equal(df, expected)
 
     def test_update_dtypes(self):
-
         # gh 3016
         df = DataFrame(
             [[1.0, 2.0, False, True], [4.0, 5.0, True, False]],
@@ -148,7 +147,8 @@ class TestDataFrameUpdate:
         if using_copy_on_write:
             df.update({"c": Series(["foo"], index=[0])})
         else:
-            df["c"].update(Series(["foo"], index=[0]))
+            with tm.assert_produces_warning(FutureWarning, match="incompatible dtype"):
+                df["c"].update(Series(["foo"], index=[0]))
 
         expected = DataFrame({"a": [1, 3], "b": [np.nan, 2], "c": ["foo", np.nan]})
         tm.assert_frame_equal(df, expected)
@@ -167,3 +167,13 @@ class TestDataFrameUpdate:
             tm.assert_frame_equal(result_view, df2_orig)
         else:
             tm.assert_frame_equal(result_view, expected)
+
+    def test_update_dt_column_with_NaT_create_column(self):
+        # GH#16713
+        df = DataFrame({"A": [1, None], "B": [pd.NaT, pd.to_datetime("2016-01-01")]})
+        df2 = DataFrame({"A": [2, 3]})
+        df.update(df2, overwrite=False)
+        expected = DataFrame(
+            {"A": [1.0, 3.0], "B": [pd.NaT, pd.to_datetime("2016-01-01")]}
+        )
+        tm.assert_frame_equal(df, expected)

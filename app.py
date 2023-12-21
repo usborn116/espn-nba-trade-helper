@@ -6,9 +6,9 @@ import pandas as pd
 db = SQLAlchemy()
 
 app = Flask(__name__)
-#app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///league.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///league.db'
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///league'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:3N2OVxtH1T4GoTj@espn-trade-helper-db.flycast:5432'
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:3N2OVxtH1T4GoTj@espn-trade-helper-db.flycast:5432'
 
 db.init_app(app)
 
@@ -84,7 +84,7 @@ def comp():
     comp = [teamcompdf.head(1),tmpteam1df]
     comp = pd.concat(comp)
     diffs = comp.diff()
-    comp = comp.append(diffs)
+    comp = pd.concat([comp, diffs])
     i = diffs.index.tolist()[1]
     return render_template('comp.html', data=0, leagueid=ThisLeague.query.first(), tcomptable=teamcompdf.to_html(), playersreleasing=to_tradedf.to_html(), playersgetting=gettingdf.to_html(), statchange=diffs.loc[[i]].to_html())
 

@@ -1,4 +1,4 @@
-#!/Users/usbornocampo/dev-projects/python_projects/fantasy_trade_helper/.venv/bin/python
+#!/Users/usbornocampo/dev-projects/python_projects/fantasy_trade_helper/.venv/bin/python3.11
 # -*- coding: utf-8 -*-
 import re
 import sys

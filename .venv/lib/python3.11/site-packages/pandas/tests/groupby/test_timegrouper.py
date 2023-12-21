@@ -1,13 +1,15 @@
-""" test with the TimeGrouper / grouping with datetimes """
-
-from datetime import datetime
+"""
+test with the TimeGrouper / grouping with datetimes
+"""
+from datetime import (
+    datetime,
+    timedelta,
+)
 from io import StringIO
 
 import numpy as np
 import pytest
 import pytz
-
-import pandas.util._test_decorators as td
 
 import pandas as pd
 from pandas import (
@@ -98,25 +100,26 @@ class TestGroupBy:
             df = df.set_index(["Date"])
 
             expected = DataFrame(
-                {"Quantity": 0},
+                {"Buyer": 0, "Quantity": 0},
                 index=date_range(
                     "20130901", "20131205", freq="5D", name="Date", inclusive="left"
                 ),
             )
-            expected.iloc[[0, 6, 18], 0] = np.array([24, 6, 9], dtype="int64")
+            # Cast to object to avoid implicit cast when setting entry to "CarlCarlCarl"
+            expected = expected.astype({"Buyer": object})
+            expected.iloc[0, 0] = "CarlCarlCarl"
+            expected.iloc[6, 0] = "CarlCarl"
+            expected.iloc[18, 0] = "Joe"
+            expected.iloc[[0, 6, 18], 1] = np.array([24, 6, 9], dtype="int64")
 
-            msg = "The default value of numeric_only"
-            with tm.assert_produces_warning(FutureWarning, match=msg):
-                result1 = df.resample("5D").sum()
+            result1 = df.resample("5D").sum()
             tm.assert_frame_equal(result1, expected)
 
             df_sorted = df.sort_index()
-            with tm.assert_produces_warning(FutureWarning, match=msg):
-                result2 = df_sorted.groupby(Grouper(freq="5D")).sum()
+            result2 = df_sorted.groupby(Grouper(freq="5D")).sum()
             tm.assert_frame_equal(result2, expected)
 
-            with tm.assert_produces_warning(FutureWarning, match=msg):
-                result3 = df.groupby(Grouper(freq="5D")).sum()
+            result3 = df.groupby(Grouper(freq="5D")).sum()
             tm.assert_frame_equal(result3, expected)
 
     @pytest.mark.parametrize("should_sort", [True, False])
@@ -153,7 +156,6 @@ class TestGroupBy:
         assert len(groups) == 3
 
     def test_timegrouper_with_reg_groups(self):
-
         # GH 3794
         # allow combination of timegrouper/reg groups
 
@@ -191,8 +193,7 @@ class TestGroupBy:
             ).set_index(["Date", "Buyer"])
 
             msg = "The default value of numeric_only"
-            with tm.assert_produces_warning(FutureWarning, match=msg):
-                result = df.groupby([Grouper(freq="A"), "Buyer"]).sum()
+            result = df.groupby([Grouper(freq="A"), "Buyer"]).sum(numeric_only=True)
             tm.assert_frame_equal(result, expected)
 
             expected = DataFrame(
@@ -207,8 +208,7 @@ class TestGroupBy:
                     ],
                 }
             ).set_index(["Date", "Buyer"])
-            with tm.assert_produces_warning(FutureWarning, match=msg):
-                result = df.groupby([Grouper(freq="6MS"), "Buyer"]).sum()
+            result = df.groupby([Grouper(freq="6MS"), "Buyer"]).sum(numeric_only=True)
             tm.assert_frame_equal(result, expected)
 
         df_original = DataFrame(
@@ -231,7 +231,6 @@ class TestGroupBy:
 
         df_sorted = df_original.sort_values(by="Quantity", ascending=False)
         for df in [df_original, df_sorted]:
-
             expected = DataFrame(
                 {
                     "Buyer": "Carl Joe Mark Carl Joe".split(),
@@ -246,13 +245,10 @@ class TestGroupBy:
                 }
             ).set_index(["Date", "Buyer"])
 
-            warn_msg = "The default value of numeric_only"
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby([Grouper(freq="1D"), "Buyer"]).sum()
+            result = df.groupby([Grouper(freq="1D"), "Buyer"]).sum(numeric_only=True)
             tm.assert_frame_equal(result, expected)
 
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby([Grouper(freq="1M"), "Buyer"]).sum()
+            result = df.groupby([Grouper(freq="1M"), "Buyer"]).sum(numeric_only=True)
             expected = DataFrame(
                 {
                     "Buyer": "Carl Joe Mark".split(),
@@ -268,8 +264,9 @@ class TestGroupBy:
 
             # passing the name
             df = df.reset_index()
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby([Grouper(freq="1M", key="Date"), "Buyer"]).sum()
+            result = df.groupby([Grouper(freq="1M", key="Date"), "Buyer"]).sum(
+                numeric_only=True
+            )
             tm.assert_frame_equal(result, expected)
 
             with pytest.raises(KeyError, match="'The grouper name foo is not found'"):
@@ -277,11 +274,13 @@ class TestGroupBy:
 
             # passing the level
             df = df.set_index("Date")
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby([Grouper(freq="1M", level="Date"), "Buyer"]).sum()
+            result = df.groupby([Grouper(freq="1M", level="Date"), "Buyer"]).sum(
+                numeric_only=True
+            )
             tm.assert_frame_equal(result, expected)
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby([Grouper(freq="1M", level=0), "Buyer"]).sum()
+            result = df.groupby([Grouper(freq="1M", level=0), "Buyer"]).sum(
+                numeric_only=True
+            )
             tm.assert_frame_equal(result, expected)
 
             with pytest.raises(ValueError, match="The level foo is not valid"):
@@ -290,8 +289,9 @@ class TestGroupBy:
             # multi names
             df = df.copy()
             df["Date"] = df.index + offsets.MonthEnd(2)
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby([Grouper(freq="1M", key="Date"), "Buyer"]).sum()
+            result = df.groupby([Grouper(freq="1M", key="Date"), "Buyer"]).sum(
+                numeric_only=True
+            )
             expected = DataFrame(
                 {
                     "Buyer": "Carl Joe Mark".split(),
@@ -320,22 +320,18 @@ class TestGroupBy:
                     [datetime(2013, 10, 31, 0, 0)], freq=offsets.MonthEnd(), name="Date"
                 ),
             )
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby(Grouper(freq="1M")).sum()
+            result = df.groupby(Grouper(freq="1M")).sum(numeric_only=True)
             tm.assert_frame_equal(result, expected)
 
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby([Grouper(freq="1M")]).sum()
+            result = df.groupby([Grouper(freq="1M")]).sum(numeric_only=True)
             tm.assert_frame_equal(result, expected)
 
             expected.index = expected.index.shift(1)
             assert expected.index.freq == offsets.MonthEnd()
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby(Grouper(freq="1M", key="Date")).sum()
+            result = df.groupby(Grouper(freq="1M", key="Date")).sum(numeric_only=True)
             tm.assert_frame_equal(result, expected)
 
-            with tm.assert_produces_warning(FutureWarning, match=warn_msg):
-                result = df.groupby([Grouper(freq="1M", key="Date")]).sum()
+            result = df.groupby([Grouper(freq="1M", key="Date")]).sum(numeric_only=True)
             tm.assert_frame_equal(result, expected)
 
     @pytest.mark.parametrize("freq", ["D", "M", "A", "Q-APR"])
@@ -508,7 +504,7 @@ class TestGroupBy:
 
         # it works!
         groups = grouped.groups
-        assert isinstance(list(groups.keys())[0], datetime)
+        assert isinstance(next(iter(groups.keys())), datetime)
 
         # GH#11442
         index = date_range("2015/01/01", periods=5, name="date")
@@ -601,7 +597,6 @@ class TestGroupBy:
         assert result["date"][3] == Timestamp("2012-07-03")
 
     def test_groupby_multi_timezone(self):
-
         # combining multiple / different timezones yields UTC
 
         data = """0,2000-01-28 16:47:00,America/Chicago
@@ -718,7 +713,8 @@ class TestGroupBy:
         # GH 5869
         # datetimelike dtype conversion from int
         df = DataFrame({"A": Timestamp("20130101"), "B": np.arange(5)})
-        expected = df.groupby("A")["A"].apply(lambda x: x.max())
+        # TODO: can we retain second reso in .apply here?
+        expected = df.groupby("A")["A"].apply(lambda x: x.max()).astype("M8[s]")
         result = df.groupby("A")["A"].max()
         tm.assert_series_equal(result, expected)
 
@@ -727,17 +723,17 @@ class TestGroupBy:
         # 32-bit under 1.9-dev indexing issue
 
         df = DataFrame({"A": range(2), "B": [Timestamp("2000-01-1")] * 2})
-        result = df.groupby("A")["B"].transform(min)
+        result = df.groupby("A")["B"].transform("min")
         expected = Series([Timestamp("2000-01-1")] * 2, name="B")
         tm.assert_series_equal(result, expected)
 
     def test_groupby_with_timezone_selection(self):
         # GH 11616
         # Test that column selection returns output in correct timezone.
-        np.random.seed(42)
+
         df = DataFrame(
             {
-                "factor": np.random.randint(0, 3, size=60),
+                "factor": np.random.default_rng(2).integers(0, 3, size=60),
                 "time": date_range("01/01/2000 00:00", periods=60, freq="s", tz="UTC"),
             }
         )
@@ -767,8 +763,6 @@ class TestGroupBy:
         # GH 10295
         # Verify that NaT is not in the result of max, min, first and last on
         # Dataframe with datetime or timedelta values.
-        from datetime import timedelta as td
-
         df_test = DataFrame(
             {
                 "dt": [
@@ -778,7 +772,13 @@ class TestGroupBy:
                     "2015-07-23 12:12",
                     np.nan,
                 ],
-                "td": [np.nan, td(days=1), td(days=2), td(days=3), np.nan],
+                "td": [
+                    np.nan,
+                    timedelta(days=1),
+                    timedelta(days=2),
+                    timedelta(days=3),
+                    np.nan,
+                ],
             }
         )
         df_test.dt = pd.to_datetime(df_test.dt)
@@ -887,9 +887,7 @@ class TestGroupBy:
         # We need to create a GroupBy object with only one non-NaT group,
         #  so use a huge freq so that all non-NaT dates will be grouped together
         tdg = Grouper(key="Date", freq="100Y")
-
-        with tm.assert_produces_warning(FutureWarning, match="`squeeze` parameter"):
-            gb = df.groupby(tdg, squeeze=True)
+        gb = df.groupby(tdg)
 
         # check that we will go through the singular_series path
         #  in _wrap_applied_output_series
@@ -899,18 +897,19 @@ class TestGroupBy:
         # function that returns a Series
         res = gb.apply(lambda x: x["Quantity"] * 2)
 
-        key = Timestamp("2013-12-31")
-        ordering = df["Date"].sort_values().dropna().index
-        mi = MultiIndex.from_product([[key], ordering], names=["Date", None])
+        expected = DataFrame(
+            [[36, 6, 6, 10, 2]],
+            index=Index([Timestamp("2013-12-31")], name="Date"),
+            columns=Index([0, 1, 5, 2, 3], name="Quantity"),
+        )
+        tm.assert_frame_equal(res, expected)
 
-        ex_values = df["Quantity"].take(ordering).values * 2
-        expected = Series(ex_values, index=mi, name="Quantity")
-        tm.assert_series_equal(res, expected)
-
-    @td.skip_if_no("numba")
+    @pytest.mark.single_cpu
     def test_groupby_agg_numba_timegrouper_with_nat(
         self, groupby_with_truncated_bingrouper
     ):
+        pytest.importorskip("numba")
+
         # See discussion in GH#43487
         gb = groupby_with_truncated_bingrouper
 
@@ -918,11 +917,11 @@ class TestGroupBy:
             lambda values, index: np.nanmean(values), engine="numba"
         )
 
-        expected = gb["Quantity"].aggregate(np.nanmean)
+        expected = gb["Quantity"].aggregate("mean")
         tm.assert_series_equal(result, expected)
 
         result_df = gb[["Quantity"]].aggregate(
             lambda values, index: np.nanmean(values), engine="numba"
         )
-        expected_df = gb[["Quantity"]].aggregate(np.nanmean)
+        expected_df = gb[["Quantity"]].aggregate("mean")
         tm.assert_frame_equal(result_df, expected_df)

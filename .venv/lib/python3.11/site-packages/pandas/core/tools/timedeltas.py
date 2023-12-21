@@ -3,11 +3,11 @@ timedelta support tools
 """
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
     overload,
 )
+import warnings
 
 import numpy as np
 
@@ -20,8 +20,10 @@ from pandas._libs.tslibs.timedeltas import (
     Timedelta,
     parse_timedelta_unit,
 )
+from pandas.util._exceptions import find_stack_level
 
 from pandas.core.dtypes.common import is_list_like
+from pandas.core.dtypes.dtypes import ArrowDtype
 from pandas.core.dtypes.generic import (
     ABCIndex,
     ABCSeries,
@@ -30,6 +32,9 @@ from pandas.core.dtypes.generic import (
 from pandas.core.arrays.timedeltas import sequence_to_td64ns
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
+    from datetime import timedelta
+
     from pandas._libs.tslibs.timedeltas import UnitChoices
     from pandas._typing import (
         ArrayLike,
@@ -97,9 +102,9 @@ def to_timedelta(
     arg : str, timedelta, list-like or Series
         The data to be converted to timedelta.
 
-        .. deprecated:: 1.2
+        .. versionchanged:: 2.0
             Strings with units 'M', 'Y' and 'y' do not represent
-            unambiguous timedelta values and will be removed in a future version
+            unambiguous timedelta values and will raise an exception.
 
     unit : str, optional
         Denotes the unit of the arg for numeric `arg`. Defaults to ``"ns"``.
@@ -115,10 +120,10 @@ def to_timedelta(
         * 'us' / 'microseconds' / 'microsecond' / 'micro' / 'micros' / 'U'
         * 'ns' / 'nanoseconds' / 'nano' / 'nanos' / 'nanosecond' / 'N'
 
-        .. versionchanged:: 1.1.0
+        Must not be specified when `arg` context strings and ``errors="raise"``.
 
-           Must not be specified when `arg` context strings and
-           ``errors="raise"``.
+        .. deprecated:: 2.1.0
+            Units 'T' and 'L' are deprecated and will be removed in a future version.
 
     errors : {'ignore', 'raise', 'coerce'}, default 'raise'
         - If 'raise', then invalid parsing will raise an exception.
@@ -171,6 +176,13 @@ def to_timedelta(
     TimedeltaIndex(['0 days', '1 days', '2 days', '3 days', '4 days'],
                    dtype='timedelta64[ns]', freq=None)
     """
+    if unit in {"T", "t", "L", "l"}:
+        warnings.warn(
+            f"Unit '{unit}' is deprecated and will be removed in a future version.",
+            FutureWarning,
+            stacklevel=find_stack_level(),
+        )
+
     if unit is not None:
         unit = parse_timedelta_unit(unit)
 
@@ -211,7 +223,9 @@ def to_timedelta(
     return _coerce_scalar_to_timedelta_type(arg, unit=unit, errors=errors)
 
 
-def _coerce_scalar_to_timedelta_type(r, unit="ns", errors="raise"):
+def _coerce_scalar_to_timedelta_type(
+    r, unit: UnitChoices | None = "ns", errors: DateTimeErrorChoices = "raise"
+):
     """Convert string 'r' to a timedelta object."""
     result: Timedelta | NaTType
 
@@ -220,7 +234,7 @@ def _coerce_scalar_to_timedelta_type(r, unit="ns", errors="raise"):
     except ValueError:
         if errors == "raise":
             raise
-        elif errors == "ignore":
+        if errors == "ignore":
             return r
 
         # coerce
@@ -229,14 +243,24 @@ def _coerce_scalar_to_timedelta_type(r, unit="ns", errors="raise"):
     return result
 
 
-def _convert_listlike(arg, unit=None, errors="raise", name=None):
+def _convert_listlike(
+    arg,
+    unit: UnitChoices | None = None,
+    errors: DateTimeErrorChoices = "raise",
+    name: Hashable | None = None,
+):
     """Convert a list of objects to a timedelta index object."""
-    if isinstance(arg, (list, tuple)) or not hasattr(arg, "dtype"):
+    arg_dtype = getattr(arg, "dtype", None)
+    if isinstance(arg, (list, tuple)) or arg_dtype is None:
         # This is needed only to ensure that in the case where we end up
         #  returning arg (errors == "ignore"), and where the input is a
         #  generator, we return a useful list-like instead of a
         #  used-up generator
-        arg = np.array(list(arg), dtype=object)
+        if not hasattr(arg, "__array__"):
+            arg = list(arg)
+        arg = np.array(arg, dtype=object)
+    elif isinstance(arg_dtype, ArrowDtype) and arg_dtype.kind == "m":
+        return arg
 
     try:
         td64arr = sequence_to_td64ns(arg, unit=unit, errors=errors, copy=False)[0]

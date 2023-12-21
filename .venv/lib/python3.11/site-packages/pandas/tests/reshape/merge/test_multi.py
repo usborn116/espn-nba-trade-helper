@@ -6,6 +6,7 @@ from pandas import (
     DataFrame,
     Index,
     MultiIndex,
+    RangeIndex,
     Series,
     Timestamp,
 )
@@ -21,7 +22,7 @@ def left():
     key1 = ["bar", "bar", "bar", "foo", "foo", "baz", "baz", "qux", "qux", "snap"]
     key2 = ["two", "one", "three", "one", "two", "one", "two", "two", "three", "one"]
 
-    data = np.random.randn(len(key1))
+    data = np.random.default_rng(2).standard_normal(len(key1))
     return DataFrame({"key1": key1, "key2": key2, "data": data})
 
 
@@ -118,14 +119,21 @@ class TestMergeMulti:
 
             out = merge(left, right.reset_index(), on=icols, sort=sort, how="left")
 
-            res.index = np.arange(len(res))
+            res.index = RangeIndex(len(res))
             tm.assert_frame_equal(out, res)
 
         lc = list(map(chr, np.arange(ord("a"), ord("z") + 1)))
-        left = DataFrame(np.random.choice(lc, (5000, 2)), columns=["1st", "3rd"])
-        left.insert(1, "2nd", np.random.randint(0, 1000, len(left)))
+        left = DataFrame(
+            np.random.default_rng(2).choice(lc, (5000, 2)), columns=["1st", "3rd"]
+        )
+        # Explicit cast to float to avoid implicit cast when setting nan
+        left.insert(
+            1,
+            "2nd",
+            np.random.default_rng(2).integers(0, 1000, len(left)).astype("float"),
+        )
 
-        i = np.random.permutation(len(left))
+        i = np.random.default_rng(2).permutation(len(left))
         right = left.iloc[i].copy()
 
         left["4th"] = bind_cols(left)
@@ -140,7 +148,7 @@ class TestMergeMulti:
         left.loc[3::43, "3rd"] = np.nan
         left["4th"] = bind_cols(left)
 
-        i = np.random.permutation(len(left))
+        i = np.random.default_rng(2).permutation(len(left))
         right = left.iloc[i, :-1]
         right["5th"] = -bind_cols(right)
         right.set_index(icols, inplace=True)
@@ -184,23 +192,31 @@ class TestMergeMulti:
         tm.assert_frame_equal(result, expected)
 
     def test_compress_group_combinations(self):
-
         # ~ 40000000 possible unique groups
-        key1 = tm.rands_array(10, 10000)
+        key1 = tm.makeStringIndex(10000)
         key1 = np.tile(key1, 2)
         key2 = key1[::-1]
 
-        df = DataFrame({"key1": key1, "key2": key2, "value1": np.random.randn(20000)})
+        df = DataFrame(
+            {
+                "key1": key1,
+                "key2": key2,
+                "value1": np.random.default_rng(2).standard_normal(20000),
+            }
+        )
 
         df2 = DataFrame(
-            {"key1": key1[::2], "key2": key2[::2], "value2": np.random.randn(10000)}
+            {
+                "key1": key1[::2],
+                "key2": key2[::2],
+                "value2": np.random.default_rng(2).standard_normal(10000),
+            }
         )
 
         # just to hit the label compression code path
         merge(df, df2, how="outer")
 
     def test_left_join_index_preserve_order(self):
-
         on_cols = ["k1", "k2"]
         left = DataFrame(
             {
@@ -370,17 +386,17 @@ class TestMergeMulti:
 
         # GH7331 - maintain left frame order in left merge
         result = merge(left, right.reset_index(), how="left", on="tag")
-        expected.index = np.arange(len(expected))
+        expected.index = RangeIndex(len(expected))
         tm.assert_frame_equal(result, expected)
 
     def test_left_merge_na_buglet(self):
         left = DataFrame(
             {
                 "id": list("abcde"),
-                "v1": np.random.randn(5),
-                "v2": np.random.randn(5),
+                "v1": np.random.default_rng(2).standard_normal(5),
+                "v2": np.random.default_rng(2).standard_normal(5),
                 "dummy": list("abcde"),
-                "v3": np.random.randn(5),
+                "v3": np.random.default_rng(2).standard_normal(5),
             },
             columns=["id", "v1", "v2", "dummy", "v3"],
         )
@@ -441,14 +457,13 @@ class TestMergeMulti:
         if klass is not None:
             on_vector = klass(on_vector)
 
-        expected = DataFrame({"a": [1, 2, 3], "key_1": [2016, 2017, 2018]})
+        exp_years = np.array([2016, 2017, 2018], dtype=np.int32)
+        expected = DataFrame({"a": [1, 2, 3], "key_1": exp_years})
 
         result = df.merge(df, on=["a", on_vector], how="inner")
         tm.assert_frame_equal(result, expected)
 
-        expected = DataFrame(
-            {"key_0": [2016, 2017, 2018], "a_x": [1, 2, 3], "a_y": [1, 2, 3]}
-        )
+        expected = DataFrame({"key_0": exp_years, "a_x": [1, 2, 3], "a_y": [1, 2, 3]})
 
         result = df.merge(df, on=[df.index.year], how="inner")
         tm.assert_frame_equal(result, expected)
@@ -480,7 +495,7 @@ class TestMergeMulti:
             expected = DataFrame(
                 data={
                     "data": [1.5, 1.5],
-                    "state": [None, None],
+                    "state": np.array([np.nan, np.nan], dtype=object),
                 },
                 index=expected_index,
             )
@@ -489,7 +504,7 @@ class TestMergeMulti:
         else:
             expected = DataFrame(
                 data={
-                    "state": [None, None],
+                    "state": np.array([np.nan, np.nan], dtype=object),
                     "data": [1.5, 1.5],
                 },
                 index=expected_index,
@@ -643,7 +658,6 @@ class TestMergeMulti:
             portfolio2.join(portfolio, how="inner")
 
     def test_join_multi_levels2(self):
-
         # some more advanced merges
         # GH6360
         household = DataFrame(
@@ -822,7 +836,6 @@ class TestJoinMultiMulti:
     def test_join_multi_empty_frames(
         self, left_multi, right_multi, join_type, on_cols_multi, idx_cols_multi
     ):
-
         left_multi = left_multi.drop(columns=left_multi.columns)
         right_multi = right_multi.drop(columns=right_multi.columns)
 
@@ -852,14 +865,13 @@ class TestJoinMultiMulti:
         if box is not None:
             on_vector = box(on_vector)
 
-        expected = DataFrame({"a": [1, 2, 3], "key_1": [2016, 2017, 2018]})
+        exp_years = np.array([2016, 2017, 2018], dtype=np.int32)
+        expected = DataFrame({"a": [1, 2, 3], "key_1": exp_years})
 
         result = df.merge(df, on=["a", on_vector], how="inner")
         tm.assert_frame_equal(result, expected)
 
-        expected = DataFrame(
-            {"key_0": [2016, 2017, 2018], "a_x": [1, 2, 3], "a_y": [1, 2, 3]}
-        )
+        expected = DataFrame({"key_0": exp_years, "a_x": [1, 2, 3], "a_y": [1, 2, 3]})
 
         result = df.merge(df, on=[df.index.year], how="inner")
         tm.assert_frame_equal(result, expected)

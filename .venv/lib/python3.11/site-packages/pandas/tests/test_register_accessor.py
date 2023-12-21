@@ -1,3 +1,4 @@
+from collections.abc import Generator
 import contextlib
 
 import pytest
@@ -7,7 +8,7 @@ import pandas._testing as tm
 from pandas.core import accessor
 
 
-def test_dirname_mixin():
+def test_dirname_mixin() -> None:
     # GH37173
 
     class X(accessor.DirNamesMixin):
@@ -23,7 +24,7 @@ def test_dirname_mixin():
 
 
 @contextlib.contextmanager
-def ensure_removed(obj, attr):
+def ensure_removed(obj, attr) -> Generator[None, None, None]:
     """Ensure that an attribute added to 'obj' during the test is
     removed when we're done
     """
@@ -97,7 +98,6 @@ def test_overwrite_warns():
 
 
 def test_raises_attribute_error():
-
     with ensure_removed(pd.Series, "bad"):
 
         @pd.api.extensions.register_series_accessor("bad")

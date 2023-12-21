@@ -1,4 +1,7 @@
-from datetime import datetime
+from datetime import (
+    datetime,
+    timezone,
+)
 
 import numpy as np
 import pytest
@@ -23,7 +26,9 @@ class TestJoin:
         df = tm.makeCustomDataframe(
             10,
             10,
-            data_gen_f=lambda *args, **kwargs: np.random.randn(),
+            data_gen_f=lambda *args, **kwargs: np.random.default_rng(
+                2
+            ).standard_normal(),
             r_idx_type="i",
             c_idx_type="dt",
         )
@@ -42,7 +47,7 @@ class TestJoin:
         df = tm.makeCustomDataframe(
             10,
             10,
-            data_gen_f=lambda *args: np.random.randint(2),
+            data_gen_f=lambda *args: np.random.default_rng(2).integers(2),
             c_idx_type="p",
             r_idx_type="dt",
         )
@@ -71,7 +76,7 @@ class TestJoin:
 
         result = left.join(right[:-5], how=join_type)
         assert isinstance(result, DatetimeIndex)
-        assert result.tz.zone == "UTC"
+        assert result.tz is timezone.utc
 
     def test_datetimeindex_union_join_empty(self, sort):
         dti = date_range(start="1/1/2001", end="2/1/2001", freq="D")

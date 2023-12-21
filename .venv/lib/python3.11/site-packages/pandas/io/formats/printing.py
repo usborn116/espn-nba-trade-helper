@@ -3,14 +3,15 @@ Printing tools.
 """
 from __future__ import annotations
 
+from collections.abc import (
+    Iterable,
+    Mapping,
+    Sequence,
+)
 import sys
 from typing import (
     Any,
     Callable,
-    Dict,
-    Iterable,
-    Mapping,
-    Sequence,
     TypeVar,
     Union,
 )
@@ -43,7 +44,6 @@ def adjoin(space: int, *lists: list[str], **kwargs) -> str:
     strlen = kwargs.pop("strlen", len)
     justfunc = kwargs.pop("justfunc", justify)
 
-    out_lines = []
     newLists = []
     lengths = [max(map(strlen, x)) + space for x in lists[:-1]]
     # not the last one
@@ -51,12 +51,10 @@ def adjoin(space: int, *lists: list[str], **kwargs) -> str:
     maxLen = max(map(len, lists))
     for i, lst in enumerate(lists):
         nl = justfunc(lst, lengths[i], mode="left")
-        nl.extend([" " * lengths[i]] * (maxLen - len(lst)))
+        nl = ([" " * lengths[i]] * (maxLen - len(lst))) + nl
         newLists.append(nl)
     toJoin = zip(*newLists)
-    for lines in toJoin:
-        out_lines.append("".join(lines))
-    return "\n".join(out_lines)
+    return "\n".join("".join(lines) for lines in toJoin)
 
 
 def justify(texts: Iterable[str], max_len: int, mode: str = "right") -> list[str]:
@@ -263,19 +261,15 @@ def enable_data_resource_formatter(enable: bool) -> None:
 
             class TableSchemaFormatter(BaseFormatter):
                 print_method = ObjectName("_repr_data_resource_")
-                # Incompatible types in assignment (expression has type
-                # "Tuple[Type[Dict[Any, Any]]]", base class "BaseFormatter"
-                # defined the type as "Type[str]")
-                _return_type = (dict,)  # type: ignore[assignment]
+                _return_type = (dict,)
 
             # register it:
             formatters[mimetype] = TableSchemaFormatter()
         # enable it if it's been disabled:
         formatters[mimetype].enabled = True
-    else:
-        # unregister tableschema mime-type
-        if mimetype in formatters:
-            formatters[mimetype].enabled = False
+    # unregister tableschema mime-type
+    elif mimetype in formatters:
+        formatters[mimetype].enabled = False
 
 
 def default_pprint(thing: Any, max_seq_items: int | None = None) -> str:
@@ -316,8 +310,6 @@ def format_object_summary(
         If False, only break lines when the a line of values gets wider
         than the display width.
 
-        .. versionadded:: 0.25.0
-
     Returns
     -------
     summary string
@@ -357,7 +349,6 @@ def format_object_summary(
     def _extend_line(
         s: str, line: str, value: str, display_width: int, next_line_prefix: str
     ) -> tuple[str, str]:
-
         if adj.len(line.rstrip()) + adj.len(value.rstrip()) >= display_width:
             s += line.rstrip()
             line = next_line_prefix
@@ -382,7 +373,6 @@ def format_object_summary(
         last = formatter(obj[-1])
         summary = f"[{first}, {last}]{close}"
     else:
-
         if max_seq_items == 1:
             # If max_seq_items=1 show only last element
             head = []
@@ -420,9 +410,11 @@ def format_object_summary(
             # max_space
             max_space = display_width - len(space2)
             value = tail[0]
-            for max_items in reversed(range(1, len(value) + 1)):
-                pprinted_seq = _pprint_seq(value, max_seq_items=max_items)
+            max_items = 1
+            for num_items in reversed(range(1, len(value) + 1)):
+                pprinted_seq = _pprint_seq(value, max_seq_items=num_items)
                 if len(pprinted_seq) < max_space:
+                    max_items = num_items
                     break
             head = [_pprint_seq(x, max_seq_items=max_items) for x in head]
             tail = [_pprint_seq(x, max_seq_items=max_items) for x in tail]
@@ -430,8 +422,8 @@ def format_object_summary(
         summary = ""
         line = space2
 
-        for max_items in range(len(head)):
-            word = head[max_items] + sep + " "
+        for head_value in head:
+            word = head_value + sep + " "
             summary, line = _extend_line(summary, line, word, display_width, space2)
 
         if is_truncated:
@@ -439,8 +431,8 @@ def format_object_summary(
             summary += line.rstrip() + space2 + "..."
             line = space2
 
-        for max_items in range(len(tail) - 1):
-            word = tail[max_items] + sep + " "
+        for tail_item in tail[:-1]:
+            word = tail_item + sep + " "
             summary, line = _extend_line(summary, line, word, display_width, space2)
 
         # last value: no sep added + 1 space of width used for trailing ','
@@ -495,20 +487,16 @@ def _justify(
         max_length = [max(x, y) for x, y in zip(max_length, length)]
 
     # justify each item in each list-like in head and tail using max_length
-    head = [
+    head_tuples = [
         tuple(x.rjust(max_len) for x, max_len in zip(seq, max_length)) for seq in head
     ]
-    tail = [
+    tail_tuples = [
         tuple(x.rjust(max_len) for x, max_len in zip(seq, max_length)) for seq in tail
     ]
-    # https://github.com/python/mypy/issues/4975
-    # error: Incompatible return value type (got "Tuple[List[Sequence[str]],
-    #  List[Sequence[str]]]", expected "Tuple[List[Tuple[str, ...]],
-    #  List[Tuple[str, ...]]]")
-    return head, tail  # type: ignore[return-value]
+    return head_tuples, tail_tuples
 
 
-class PrettyDict(Dict[_KT, _VT]):
+class PrettyDict(dict[_KT, _VT]):
     """Dict extension to support abbreviated __repr__"""
 
     def __repr__(self) -> str:

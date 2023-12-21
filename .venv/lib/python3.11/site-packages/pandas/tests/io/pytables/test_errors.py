@@ -1,7 +1,6 @@
 import datetime
 from io import BytesIO
 import re
-from warnings import catch_warnings
 
 import numpy as np
 import pytest
@@ -15,10 +14,7 @@ from pandas import (
     date_range,
     read_hdf,
 )
-from pandas.tests.io.pytables.common import (
-    ensure_clean_path,
-    ensure_clean_store,
-)
+from pandas.tests.io.pytables.common import ensure_clean_store
 
 from pandas.io.pytables import (
     Term,
@@ -29,7 +25,6 @@ pytestmark = pytest.mark.single_cpu
 
 
 def test_pass_spec_to_storer(setup_path):
-
     df = tm.makeDataFrame()
 
     with ensure_clean_store(setup_path) as store:
@@ -60,9 +55,7 @@ def test_table_index_incompatible_dtypes(setup_path):
 
 
 def test_unimplemented_dtypes_table_columns(setup_path):
-
     with ensure_clean_store(setup_path) as store:
-
         dtypes = [("date", datetime.date(2001, 1, 2))]
 
         # currently not supported dtypes ####
@@ -78,7 +71,7 @@ def test_unimplemented_dtypes_table_columns(setup_path):
     df["obj1"] = "foo"
     df["obj2"] = "bar"
     df["datetime1"] = datetime.date(2001, 1, 2)
-    df = df._consolidate()._convert(datetime=True)
+    df = df._consolidate()
 
     with ensure_clean_store(setup_path) as store:
         # this fails because we have a date in the object block......
@@ -90,79 +83,73 @@ because its data contents are not [string] but [date] object dtype"""
             store.append("df_unimplemented", df)
 
 
-def test_invalid_terms(setup_path):
-
+def test_invalid_terms(tmp_path, setup_path):
     with ensure_clean_store(setup_path) as store:
+        df = tm.makeTimeDataFrame()
+        df["string"] = "foo"
+        df.loc[df.index[0:4], "string"] = "bar"
 
-        with catch_warnings(record=True):
+        store.put("df", df, format="table")
 
-            df = tm.makeTimeDataFrame()
-            df["string"] = "foo"
-            df.loc[df.index[0:4], "string"] = "bar"
+        # some invalid terms
+        msg = re.escape("__init__() missing 1 required positional argument: 'where'")
+        with pytest.raises(TypeError, match=msg):
+            Term()
 
-            store.put("df", df, format="table")
-
-            # some invalid terms
-            msg = re.escape(
-                "__init__() missing 1 required positional argument: 'where'"
-            )
-            with pytest.raises(TypeError, match=msg):
-                Term()
-
-            # more invalid
-            msg = re.escape(
-                "cannot process expression [df.index[3]], "
-                "[2000-01-06 00:00:00] is not a valid condition"
-            )
-            with pytest.raises(ValueError, match=msg):
-                store.select("df", "df.index[3]")
-
-            msg = "invalid syntax"
-            with pytest.raises(SyntaxError, match=msg):
-                store.select("df", "index>")
-
-    # from the docs
-    with ensure_clean_path(setup_path) as path:
-        dfq = DataFrame(
-            np.random.randn(10, 4),
-            columns=list("ABCD"),
-            index=date_range("20130101", periods=10),
-        )
-        dfq.to_hdf(path, "dfq", format="table", data_columns=True)
-
-        # check ok
-        read_hdf(path, "dfq", where="index>Timestamp('20130104') & columns=['A', 'B']")
-        read_hdf(path, "dfq", where="A>0 or C>0")
-
-    # catch the invalid reference
-    with ensure_clean_path(setup_path) as path:
-        dfq = DataFrame(
-            np.random.randn(10, 4),
-            columns=list("ABCD"),
-            index=date_range("20130101", periods=10),
-        )
-        dfq.to_hdf(path, "dfq", format="table")
-
-        msg = (
-            r"The passed where expression: A>0 or C>0\n\s*"
-            r"contains an invalid variable reference\n\s*"
-            r"all of the variable references must be a reference to\n\s*"
-            r"an axis \(e.g. 'index' or 'columns'\), or a data_column\n\s*"
-            r"The currently defined references are: index,columns\n"
+        # more invalid
+        msg = re.escape(
+            "cannot process expression [df.index[3]], "
+            "[2000-01-06 00:00:00] is not a valid condition"
         )
         with pytest.raises(ValueError, match=msg):
-            read_hdf(path, "dfq", where="A>0 or C>0")
+            store.select("df", "df.index[3]")
+
+        msg = "invalid syntax"
+        with pytest.raises(SyntaxError, match=msg):
+            store.select("df", "index>")
+
+    # from the docs
+    path = tmp_path / setup_path
+    dfq = DataFrame(
+        np.random.default_rng(2).standard_normal((10, 4)),
+        columns=list("ABCD"),
+        index=date_range("20130101", periods=10),
+    )
+    dfq.to_hdf(path, "dfq", format="table", data_columns=True)
+
+    # check ok
+    read_hdf(path, "dfq", where="index>Timestamp('20130104') & columns=['A', 'B']")
+    read_hdf(path, "dfq", where="A>0 or C>0")
+
+    # catch the invalid reference
+    path = tmp_path / setup_path
+    dfq = DataFrame(
+        np.random.default_rng(2).standard_normal((10, 4)),
+        columns=list("ABCD"),
+        index=date_range("20130101", periods=10),
+    )
+    dfq.to_hdf(path, "dfq", format="table")
+
+    msg = (
+        r"The passed where expression: A>0 or C>0\n\s*"
+        r"contains an invalid variable reference\n\s*"
+        r"all of the variable references must be a reference to\n\s*"
+        r"an axis \(e.g. 'index' or 'columns'\), or a data_column\n\s*"
+        r"The currently defined references are: index,columns\n"
+    )
+    with pytest.raises(ValueError, match=msg):
+        read_hdf(path, "dfq", where="A>0 or C>0")
 
 
 def test_append_with_diff_col_name_types_raises_value_error(setup_path):
-    df = DataFrame(np.random.randn(10, 1))
-    df2 = DataFrame({"a": np.random.randn(10)})
-    df3 = DataFrame({(1, 2): np.random.randn(10)})
-    df4 = DataFrame({("1", 2): np.random.randn(10)})
-    df5 = DataFrame({("1", 2, object): np.random.randn(10)})
+    df = DataFrame(np.random.default_rng(2).standard_normal((10, 1)))
+    df2 = DataFrame({"a": np.random.default_rng(2).standard_normal(10)})
+    df3 = DataFrame({(1, 2): np.random.default_rng(2).standard_normal(10)})
+    df4 = DataFrame({("1", 2): np.random.default_rng(2).standard_normal(10)})
+    df5 = DataFrame({("1", 2, object): np.random.default_rng(2).standard_normal(10)})
 
     with ensure_clean_store(setup_path) as store:
-        name = f"df_{tm.rands(10)}"
+        name = "df_diff_valerror"
         store.append(name, df)
 
         for d in (df2, df3, df4, df5):
@@ -174,7 +161,11 @@ def test_append_with_diff_col_name_types_raises_value_error(setup_path):
 
 
 def test_invalid_complib(setup_path):
-    df = DataFrame(np.random.rand(4, 5), index=list("abcd"), columns=list("ABCDE"))
+    df = DataFrame(
+        np.random.default_rng(2).random((4, 5)),
+        index=list("abcd"),
+        columns=list("ABCDE"),
+    )
     with tm.ensure_clean(setup_path) as path:
         msg = r"complib only supports \[.*\] compression."
         with pytest.raises(ValueError, match=msg):
@@ -188,13 +179,13 @@ def test_invalid_complib(setup_path):
         CategoricalIndex(list("abc")),
     ],
 )
-def test_to_hdf_multiindex_extension_dtype(idx, setup_path):
+def test_to_hdf_multiindex_extension_dtype(idx, tmp_path, setup_path):
     # GH 7775
     mi = MultiIndex.from_arrays([idx, idx])
     df = DataFrame(0, index=mi, columns=["a"])
-    with ensure_clean_path(setup_path) as path:
-        with pytest.raises(NotImplementedError, match="Saving a MultiIndex"):
-            df.to_hdf(path, "df")
+    path = tmp_path / setup_path
+    with pytest.raises(NotImplementedError, match="Saving a MultiIndex"):
+        df.to_hdf(path, "df")
 
 
 def test_unsuppored_hdf_file_error(datapath):
@@ -209,21 +200,25 @@ def test_unsuppored_hdf_file_error(datapath):
         read_hdf(data_path)
 
 
-def test_read_hdf_errors(setup_path):
-    df = DataFrame(np.random.rand(4, 5), index=list("abcd"), columns=list("ABCDE"))
+def test_read_hdf_errors(setup_path, tmp_path):
+    df = DataFrame(
+        np.random.default_rng(2).random((4, 5)),
+        index=list("abcd"),
+        columns=list("ABCDE"),
+    )
 
-    with ensure_clean_path(setup_path) as path:
-        msg = r"File [\S]* does not exist"
-        with pytest.raises(OSError, match=msg):
-            read_hdf(path, "key")
+    path = tmp_path / setup_path
+    msg = r"File [\S]* does not exist"
+    with pytest.raises(OSError, match=msg):
+        read_hdf(path, "key")
 
-        df.to_hdf(path, "df")
-        store = HDFStore(path, mode="r")
-        store.close()
+    df.to_hdf(path, "df")
+    store = HDFStore(path, mode="r")
+    store.close()
 
-        msg = "The HDFStore must be open for reading."
-        with pytest.raises(OSError, match=msg):
-            read_hdf(store, "df")
+    msg = "The HDFStore must be open for reading."
+    with pytest.raises(OSError, match=msg):
+        read_hdf(store, "df")
 
 
 def test_read_hdf_generic_buffer_errors():

@@ -1,5 +1,10 @@
+import datetime
+import sys
 from espn_api.basketball import League
 import pandas as pd
+
+
+curr_yr = datetime.date.today().year + 1
 
 #setting up the stats we want to pull for each team
 stats = ['PTS','BLK','STL','AST','OREB','DREB','TO','FGM','FTM','3PTM', 'FGA', '3PTA', 'FTA']
@@ -19,9 +24,9 @@ def teamsetup(league, id):
         for stat in stats:
             roster[player.name][stat] = 0
         try: 
-            for stat in player.stats['2023_total']['avg']:
+            for stat in player.stats[f"{curr_yr}_total"]['avg']:
                 if stat in stats:
-                    roster[player.name][stat] = player.stats['2023_total']['avg'][stat]
+                    roster[player.name][stat] = player.stats[f"{curr_yr}_total"]['avg'][stat]
         except:
             continue
                 
@@ -48,9 +53,9 @@ def teamstatsetup(league):
             avgs[team.team_name][stat] = 0
         for player in team.roster:
             try: 
-                for stat in player.stats['2023_total']['avg']:
+                for stat in player.stats[f"{curr_yr}_total"]['avg']:
                     if stat in stats:
-                        avgs[team.team_name][stat] += player.stats['2023_total']['avg'][stat]
+                        avgs[team.team_name][stat] += player.stats[f"{curr_yr}_total"]['avg'][stat]
             except:
                 continue
                 
@@ -77,10 +82,10 @@ def totrade(list, league):
     for player in list:
         player = player.strip()
         trading[player] = dict()
-        for stat in league.player_info(name = player).stats['2023_total']['avg']:
+        for stat in league.player_info(name = player).stats[f"{curr_yr}_total"]['avg']:
             if stat in stats:
                 trading[player][stat] = 0
-                trading[player][stat] = league.player_info(name = player).stats['2023_total']['avg'][stat]
+                trading[player][stat] = league.player_info(name = player).stats[f"{curr_yr}_total"]['avg'][stat]
                 
     tradingdf = pd.DataFrame(trading).transpose()
     tradingdf['AFG%'] = (tradingdf['3PTM']*0.5+tradingdf['FGM'])/tradingdf['FGA']
@@ -92,13 +97,16 @@ def totrade(list, league):
 #new df that just shows the stats of the players you are getting
 def getting(list, league):
     fromtrade = dict()
+    print(list, file=sys.stderr)
     for player in list:
         player = player.strip()
+        print(player, file=sys.stderr)
         fromtrade[player] = dict()
-        for stat in league.player_info(name = player).stats['2023_total']['avg']:
+        print(league.player_info(name = player), file=sys.stderr)
+        for stat in league.player_info(name = player).stats[f"{curr_yr}_total"]['avg']:
             if stat in stats:
                 fromtrade[player][stat] = 0
-                fromtrade[player][stat] += league.player_info(name = player).stats['2023_total']['avg'][stat]
+                fromtrade[player][stat] += league.player_info(name = player).stats[f"{curr_yr}_total"]['avg'][stat]
                 
     gettingdf = pd.DataFrame(fromtrade).transpose()
     gettingdf['AFG%'] = (gettingdf['3PTM']*0.5+gettingdf['FGM'])/gettingdf['FGA']
@@ -118,17 +126,17 @@ def posttrade(myteam, add, subtract, league):
     for player in myteam.roster:
         if player.name not in add:
             try: 
-                for stat in player.stats['2023_total']['avg']:
+                for stat in player.stats[f"{curr_yr}_total"]['avg']:
                     if stat in stats:
-                        tmpteam1[stat] += player.stats['2023_total']['avg'][stat]
+                        tmpteam1[stat] += player.stats[f"{curr_yr}_total"]['avg'][stat]
             except:
                 continue
     
     for player in subtract:
         player = player.strip()
-        for stat in league.player_info(name = player).stats['2023_total']['avg']:
+        for stat in league.player_info(name = player).stats[f"{curr_yr}_total"]['avg']:
             if stat in stats:
-                tmpteam1[stat] += league.player_info(name = player).stats['2023_total']['avg'][stat]
+                tmpteam1[stat] += league.player_info(name = player).stats[f"{curr_yr}_total"]['avg'][stat]
 
     tmpteam1df = pd.DataFrame(tmpteam1, index=[myteam.team_name])
     tmpteam1df['AFG%'] = (tmpteam1df['3PTM']*0.5+tmpteam1df['FGM'])/tmpteam1df['FGA']
@@ -145,9 +153,9 @@ def roster_maker(league, teamid):
         for stat in stats:
             roster[player.name][stat] = 0
             try: 
-                for stat in player.stats['2023_total']['avg']:
+                for stat in player.stats[f"{curr_yr}_total"]['avg']:
                     if stat in stats:
-                        roster[player.name][stat] += player.stats['2023_total']['avg'][stat]
+                        roster[player.name][stat] += player.stats[f"{curr_yr}_total"]['avg'][stat]
             except:
                 continue
                 

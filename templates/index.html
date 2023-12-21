@@ -34,7 +34,7 @@
 
     {% if ids is not defined %}
     <h2 class="subheader">Enter your League Data</h2>
-    <h4 class="subheader"><a href="https://github.com/cwendt94/espn-api/discussions/150" target="_blank">Click here for help finding your league's S2 and SW ID</a> </h4>
+    <h4 class="subheader"><a href="https://github.com/cwendt94/espn-api/discussions/150">Click here for help finding your league's S2 and SW ID</a> </h4>
     <form action="/league" method="POST" class="leagueinfo">
         <input type="text" name="s2" id="s2" placeholder="League S2">
         <input type="text" name="sw" id="sw" placeholder="League SW ID">
@@ -59,7 +59,7 @@
         </thead>
         {% for key, value in ids.items() %}
         <tr>
-            <td><a class="listing" href={{ "/teams/" ~ value['id'] }} target="_blank">{{key}}</a></td>
+            <td><a class="listing" href={{ "/teams/" ~ value['id'] }}>{{key}}</a></td>
             <td> {{value['id']}}</td>
         </tr>
         {% endfor %}

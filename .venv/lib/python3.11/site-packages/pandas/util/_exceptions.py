@@ -4,12 +4,15 @@ import contextlib
 import inspect
 import os
 import re
-from typing import Iterator
+from typing import TYPE_CHECKING
 import warnings
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @contextlib.contextmanager
-def rewrite_exception(old_name: str, new_name: str) -> Iterator[None]:
+def rewrite_exception(old_name: str, new_name: str) -> Generator[None, None, None]:
     """
     Rewrite the message of an exception.
     """
@@ -57,7 +60,7 @@ def rewrite_warning(
     target_category: type[Warning],
     new_message: str,
     new_category: type[Warning] | None = None,
-) -> Iterator[None]:
+) -> Generator[None, None, None]:
     """
     Rewrite the message of a warning.
 

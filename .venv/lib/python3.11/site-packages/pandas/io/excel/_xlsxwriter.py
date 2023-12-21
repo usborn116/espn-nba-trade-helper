@@ -5,12 +5,7 @@ from typing import (
     Any,
 )
 
-import pandas._libs.json as json
-from pandas._typing import (
-    FilePath,
-    StorageOptions,
-    WriteExcelBuffer,
-)
+from pandas._libs import json
 
 from pandas.io.excel._base import ExcelWriter
 from pandas.io.excel._util import (
@@ -19,7 +14,12 @@ from pandas.io.excel._util import (
 )
 
 if TYPE_CHECKING:
-    from xlsxwriter import Workbook
+    from pandas._typing import (
+        ExcelWriterIfSheetExists,
+        FilePath,
+        StorageOptions,
+        WriteExcelBuffer,
+    )
 
 
 class _XlsxStyler:
@@ -189,8 +189,8 @@ class XlsxWriter(ExcelWriter):
         date_format: str | None = None,
         datetime_format: str | None = None,
         mode: str = "w",
-        storage_options: StorageOptions = None,
-        if_sheet_exists: str | None = None,
+        storage_options: StorageOptions | None = None,
+        if_sheet_exists: ExcelWriterIfSheetExists | None = None,
         engine_kwargs: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
@@ -213,7 +213,11 @@ class XlsxWriter(ExcelWriter):
             engine_kwargs=engine_kwargs,
         )
 
-        self._book = Workbook(self._handles.handle, **engine_kwargs)
+        try:
+            self._book = Workbook(self._handles.handle, **engine_kwargs)
+        except TypeError:
+            self._handles.handle.close()
+            raise
 
     @property
     def book(self):
@@ -223,14 +227,6 @@ class XlsxWriter(ExcelWriter):
         This attribute can be used to access engine-specific features.
         """
         return self._book
-
-    @book.setter
-    def book(self, other: Workbook) -> None:
-        """
-        Set book instance. Class type will depend on the engine used.
-        """
-        self._deprecate_set_book()
-        self._book = other
 
     @property
     def sheets(self) -> dict[str, Any]:
@@ -266,7 +262,7 @@ class XlsxWriter(ExcelWriter):
         for cell in cells:
             val, fmt = self._value_with_fmt(cell.val)
 
-            stylekey = json.dumps(cell.style)
+            stylekey = json.ujson_dumps(cell.style)
             if fmt:
                 stylekey += fmt
 

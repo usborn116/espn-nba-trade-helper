@@ -4,6 +4,7 @@ from datetime import (
     datetime,
     time,
 )
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -15,8 +16,16 @@ from pandas.core.dtypes.generic import (
 )
 from pandas.core.dtypes.missing import notna
 
+if TYPE_CHECKING:
+    from pandas._typing import DateTimeErrorChoices
 
-def to_time(arg, format=None, infer_time_format=False, errors="raise"):
+
+def to_time(
+    arg,
+    format: str | None = None,
+    infer_time_format: bool = False,
+    errors: DateTimeErrorChoices = "raise",
+):
     """
     Parse time strings to time objects using fixed strptime formats ("%H:%M",
     "%H%M", "%I:%M%p", "%I%M%p", "%H:%M:%S", "%H%M%S", "%I:%M:%S%p",
@@ -45,7 +54,6 @@ def to_time(arg, format=None, infer_time_format=False, errors="raise"):
     """
 
     def _convert_listlike(arg, format):
-
         if isinstance(arg, (list, tuple)):
             arg = np.array(arg, dtype="O")
 
@@ -71,7 +79,7 @@ def to_time(arg, format=None, infer_time_format=False, errors="raise"):
                             f"format {format}"
                         )
                         raise ValueError(msg) from err
-                    elif errors == "ignore":
+                    if errors == "ignore":
                         return arg
                     else:
                         times.append(None)

@@ -22,39 +22,49 @@ from pandas.core.shared_docs import _shared_docs
 from pandas.io.excel._base import BaseExcelReader
 
 if TYPE_CHECKING:
+    from odf.opendocument import OpenDocument
+
     from pandas._libs.tslibs.nattype import NaTType
 
 
 @doc(storage_options=_shared_docs["storage_options"])
-class ODFReader(BaseExcelReader):
-    """
-    Read tables out of OpenDocument formatted files.
-
-    Parameters
-    ----------
-    filepath_or_buffer : str, path to be parsed or
-        an open readable stream.
-    {storage_options}
-    """
-
+class ODFReader(BaseExcelReader["OpenDocument"]):
     def __init__(
         self,
         filepath_or_buffer: FilePath | ReadBuffer[bytes],
-        storage_options: StorageOptions = None,
+        storage_options: StorageOptions | None = None,
+        engine_kwargs: dict | None = None,
     ) -> None:
+        """
+        Read tables out of OpenDocument formatted files.
+
+        Parameters
+        ----------
+        filepath_or_buffer : str, path to be parsed or
+            an open readable stream.
+        {storage_options}
+        engine_kwargs : dict, optional
+            Arbitrary keyword arguments passed to excel engine.
+        """
         import_optional_dependency("odf")
-        super().__init__(filepath_or_buffer, storage_options=storage_options)
+        super().__init__(
+            filepath_or_buffer,
+            storage_options=storage_options,
+            engine_kwargs=engine_kwargs,
+        )
 
     @property
-    def _workbook_class(self):
+    def _workbook_class(self) -> type[OpenDocument]:
         from odf.opendocument import OpenDocument
 
         return OpenDocument
 
-    def load_workbook(self, filepath_or_buffer: FilePath | ReadBuffer[bytes]):
+    def load_workbook(
+        self, filepath_or_buffer: FilePath | ReadBuffer[bytes], engine_kwargs
+    ) -> OpenDocument:
         from odf.opendocument import load
 
-        return load(filepath_or_buffer)
+        return load(filepath_or_buffer, **engine_kwargs)
 
     @property
     def empty_value(self) -> str:
@@ -90,7 +100,7 @@ class ODFReader(BaseExcelReader):
         raise ValueError(f"sheet {name} not found")
 
     def get_sheet_data(
-        self, sheet, convert_float: bool, file_rows_needed: int | None = None
+        self, sheet, file_rows_needed: int | None = None
     ) -> list[list[Scalar | NaTType]]:
         """
         Parse an ODF Table into a list of lists
@@ -122,7 +132,7 @@ class ODFReader(BaseExcelReader):
 
             for sheet_cell in sheet_cells:
                 if sheet_cell.qname == table_cell_name:
-                    value = self._get_cell_value(sheet_cell, convert_float)
+                    value = self._get_cell_value(sheet_cell)
                 else:
                     value = self.empty_value
 
@@ -146,8 +156,7 @@ class ODFReader(BaseExcelReader):
                 # add blank rows to our table
                 table.extend([[self.empty_value]] * empty_rows)
                 empty_rows = 0
-                for _ in range(row_repeat):
-                    table.append(table_row)
+                table.extend(table_row for _ in range(row_repeat))
             if file_rows_needed is not None and len(table) >= file_rows_needed:
                 break
 
@@ -183,7 +192,7 @@ class ODFReader(BaseExcelReader):
 
         return True
 
-    def _get_cell_value(self, cell, convert_float: bool) -> Scalar | NaTType:
+    def _get_cell_value(self, cell) -> Scalar | NaTType:
         from odf.namespaces import OFFICENS
 
         if str(cell) == "#N/A":
@@ -199,10 +208,9 @@ class ODFReader(BaseExcelReader):
         elif cell_type == "float":
             # GH5394
             cell_value = float(cell.attributes.get((OFFICENS, "value")))
-            if convert_float:
-                val = int(cell_value)
-                if val == cell_value:
-                    return val
+            val = int(cell_value)
+            if val == cell_value:
+                return val
             return cell_value
         elif cell_type == "percentage":
             cell_value = cell.attributes.get((OFFICENS, "value"))
@@ -214,9 +222,9 @@ class ODFReader(BaseExcelReader):
             return float(cell_value)
         elif cell_type == "date":
             cell_value = cell.attributes.get((OFFICENS, "date-value"))
-            return pd.to_datetime(cell_value)
+            return pd.Timestamp(cell_value)
         elif cell_type == "time":
-            stamp = pd.to_datetime(str(cell))
+            stamp = pd.Timestamp(str(cell))
             # cast needed here because Scalar doesn't include datetime.time
             return cast(Scalar, stamp.time())
         else:
